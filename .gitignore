@@ -1,0 +1,9 @@
+data-engine/vendor/
+data-engine/.deps/
+data-engine/.deps2/
+data-engine/pip*.out
+data-engine/pip*.err
+data-engine/uvicorn.out
+data-engine/uvicorn.err
+__pycache__/
+.pytest_cache/
