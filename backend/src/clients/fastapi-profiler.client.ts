@@ -2,6 +2,10 @@ import axios, { AxiosError } from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
 import {
+  parseProfilerResponse,
+  type ProfilerResponseV1,
+} from '../contracts/profiler-response';
+import {
   ProfilerUnavailableError,
   ProfilerTimeoutError,
   ProfilerHttpError,
@@ -17,7 +21,7 @@ export class FastAPIProfilerClient {
     this.timeoutMs = parseInt(process.env.FASTAPI_TIMEOUT_MS || '10000', 10);
   }
 
-  async profile(filePath: string): Promise<any> {
+  async profile(filePath: string): Promise<ProfilerResponseV1> {
     const formData = new FormData();
     // Use a generic filename to avoid exposing local filesystem paths
     formData.append('file', fs.createReadStream(filePath), { filename: 'upload.csv' });
@@ -32,7 +36,7 @@ export class FastAPIProfilerClient {
         throw new ProfilerInvalidResponseError('Malformed or empty response from profiler');
       }
 
-      return response.data;
+      return parseProfilerResponse(response.data);
     } catch (error: unknown) {
       if (error instanceof ProfilerInvalidResponseError) {
         throw error;
