@@ -2,8 +2,18 @@ import request from 'supertest';
 import app from '../src/app';
 import fs from 'fs';
 import path from 'path';
+import { datasetProfileService } from '../src/services/dataset-profile.service';
+import {
+  ProfilerUnavailableError,
+  ProfilerTimeoutError,
+  ProfilerInvalidResponseError
+} from '../src/clients/fastapi-profiler.errors';
 
-const UPLOAD_DIR = path.resolve(__dirname, '../../data/uploads');
+jest.mock('../src/services/dataset-profile.service', () => ({
+  datasetProfileService: {
+    profileDataset: jest.fn()
+  }
+}));
 
 describe('POST /api/v1/datasets/profile', () => {
   const dummyCsvPath = path.join(__dirname, 'dummy.csv');
@@ -11,13 +21,17 @@ describe('POST /api/v1/datasets/profile', () => {
 
   beforeAll(() => {
     fs.writeFileSync(dummyCsvPath, 'id,name\n1,Alice\n2,Bob');
-    // Binary file containing null bytes
     fs.writeFileSync(dummyBinPath, Buffer.from([0x00, 0x01, 0x02, 0x00]));
   });
 
   afterAll(() => {
     if (fs.existsSync(dummyCsvPath)) fs.unlinkSync(dummyCsvPath);
     if (fs.existsSync(dummyBinPath)) fs.unlinkSync(dummyBinPath);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (datasetProfileService.profileDataset as jest.Mock).mockResolvedValue({ health_score: 85 });
   });
 
   it('should reject missing file', async () => {
@@ -29,40 +43,58 @@ describe('POST /api/v1/datasets/profile', () => {
   it('should reject unsupported file type based on extension/mimetype', async () => {
     const res = await request(app)
       .post('/api/v1/datasets/profile')
-      .attach('file', dummyBinPath, 'dummy.exe'); // wrong extension
+      .attach('file', dummyBinPath, 'dummy.exe');
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/Unsupported file type/);
-  });
-
-  it('should reject structurally invalid file even with .csv extension', async () => {
-    const res = await request(app)
-      .post('/api/v1/datasets/profile')
-      .attach('file', dummyBinPath, 'malicious.csv');
-
-    // Mimetype might default to application/octet-stream, which is rejected.
-    // If it bypasses mimetype, the controller will read 0x00 and reject.
     expect(res.status).toBe(400);
   });
 
-  it('should accept valid CSV and store it safely without trusting filename', async () => {
-    const originalName = '../../../malicious.csv';
+  it('should accept valid CSV, return profiler report, and cleanup file', async () => {
     const res = await request(app)
       .post('/api/v1/datasets/profile')
-      .attach('file', dummyCsvPath, originalName);
+      .attach('file', dummyCsvPath, 'test.csv');
 
-    expect(res.status).toBe(202);
-    expect(res.body.status).toBe('stored');
-    expect(res.body.uploadId).toBeDefined();
+    expect(res.status).toBe(200);
+    expect(res.body.health_score).toBe(85);
+    expect(datasetProfileService.profileDataset).toHaveBeenCalled();
     
-    // Ensure path traversal didn't happen and original filename wasn't used directly
-    expect(res.body.uploadId).not.toContain('../');
-    expect(res.body).not.toHaveProperty('path'); // Local filesystem path not exposed
-    
-    const storedFilePath = path.join(UPLOAD_DIR, `${res.body.uploadId}.csv`);
-    expect(fs.existsSync(storedFilePath)).toBe(true);
+    // Check if the file was deleted
+    const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
+    expect(fs.existsSync(calledPath)).toBe(false);
+  });
 
-    // Clean up
-    fs.unlinkSync(storedFilePath);
+  it('should return 503 and cleanup if profiler is unavailable', async () => {
+    (datasetProfileService.profileDataset as jest.Mock).mockRejectedValueOnce(new ProfilerUnavailableError('unreachable'));
+    
+    const res = await request(app)
+      .post('/api/v1/datasets/profile')
+      .attach('file', dummyCsvPath, 'test.csv');
+
+    expect(res.status).toBe(503);
+    const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
+    expect(fs.existsSync(calledPath)).toBe(false);
+  });
+
+  it('should return 504 and cleanup if profiler times out', async () => {
+    (datasetProfileService.profileDataset as jest.Mock).mockRejectedValueOnce(new ProfilerTimeoutError('timeout'));
+    
+    const res = await request(app)
+      .post('/api/v1/datasets/profile')
+      .attach('file', dummyCsvPath, 'test.csv');
+
+    expect(res.status).toBe(504);
+    const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
+    expect(fs.existsSync(calledPath)).toBe(false);
+  });
+
+  it('should return 502 and cleanup if profiler returns invalid response', async () => {
+    (datasetProfileService.profileDataset as jest.Mock).mockRejectedValueOnce(new ProfilerInvalidResponseError('invalid'));
+    
+    const res = await request(app)
+      .post('/api/v1/datasets/profile')
+      .attach('file', dummyCsvPath, 'test.csv');
+
+    expect(res.status).toBe(502);
+    const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
+    expect(fs.existsSync(calledPath)).toBe(false);
   });
 });

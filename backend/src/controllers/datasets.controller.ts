@@ -1,32 +1,52 @@
 import { Request, Response } from 'express';
 import fs from 'fs';
+import { datasetProfileService } from '../services/dataset-profile.service';
+import {
+  ProfilerUnavailableError,
+  ProfilerTimeoutError,
+  ProfilerHttpError,
+  ProfilerInvalidResponseError
+} from '../clients/fastapi-profiler.errors';
 
-export const uploadDataset = (req: Request, res: Response): void => {
+export const uploadDataset = async (req: Request, res: Response): Promise<void> => {
   if (!req.file) {
     res.status(400).json({ error: 'Missing file. Please upload a CSV file.' });
     return;
   }
 
-  // Basic sanity check for CSV structural content
+  const filePath = req.file.path;
+
   try {
-    const buffer = fs.readFileSync(req.file.path);
-    // Just read first 512 bytes for a quick check. Should not contain null bytes (binary indicator).
+    // Basic sanity check for CSV structural content
+    const buffer = fs.readFileSync(filePath);
     const chunk = buffer.subarray(0, 512);
     if (chunk.includes(0x00)) {
-      // It's binary, not a CSV
-      fs.unlinkSync(req.file.path);
       res.status(400).json({ error: 'Invalid file format. Expected a text-based CSV.' });
       return;
     }
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to read uploaded file' });
-    return;
-  }
 
-  // File is accepted
-  res.status(202).json({
-    uploadId: req.file.filename.split('.')[0],
-    status: 'stored',
-    message: 'File accepted for profiling.',
-  });
+    // Call service to get profiler report
+    const report = await datasetProfileService.profileDataset(filePath);
+
+    res.status(200).json(report);
+  } catch (err) {
+    if (err instanceof ProfilerUnavailableError) {
+      res.status(503).json({ error: 'Profiler service unavailable' });
+    } else if (err instanceof ProfilerTimeoutError) {
+      res.status(504).json({ error: 'Profiler request timed out' });
+    } else if (err instanceof ProfilerHttpError || err instanceof ProfilerInvalidResponseError) {
+      res.status(502).json({ error: 'Bad gateway: Profiler returned an error or invalid response' });
+    } else {
+      res.status(500).json({ error: 'Internal server error during profiling orchestration' });
+    }
+  } finally {
+    // Cleanup temporary file
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch (e) {
+        console.error('Failed to clean up file:', filePath, e);
+      }
+    }
+  }
 };
