@@ -4,6 +4,9 @@ import type { ProfilerResponse } from '../types/profiler';
 interface HealthReportProps {
   report: ProfilerResponse;
   onReset: () => void;
+  datasetId?: string;
+  datasetName?: string;
+  isHistorical?: boolean;
 }
 
 const severityOrder = ['error', 'warning', 'info'] as const;
@@ -41,7 +44,7 @@ const formatFindingMessage = (finding: ProfilerResponse['findings'][number]) => 
   return `Data quality issue detected in ${finding.column} for ${finding.rule_id}.`;
 };
 
-export function HealthReport({ report, onReset }: HealthReportProps) {
+export function HealthReport({ report, onReset, datasetId, datasetName, isHistorical = false }: HealthReportProps) {
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
 
   const totalFindings = report.findings.length;
@@ -104,8 +107,9 @@ export function HealthReport({ report, onReset }: HealthReportProps) {
     <div className="report-shell">
       <header className="report-header">
         <div className="report-heading-group">
-          <p className="eyebrow">Dataset Health</p>
-          <h2>{report.file_summary.file_sha256 ? 'Uploaded dataset' : 'Dataset report'}</h2>
+          <p className="eyebrow">{isHistorical ? 'Saved Dataset' : 'Dataset Health'}</p>
+          <h2>{datasetName || (report.file_summary.file_sha256 ? 'Uploaded dataset' : 'Dataset report')}</h2>
+          {datasetId && <p className="report-id">Dataset ID {datasetId}</p>}
         </div>
         <button type="button" className="secondary-button" onClick={onReset}>
           Analyze another dataset
@@ -133,7 +137,7 @@ export function HealthReport({ report, onReset }: HealthReportProps) {
               : `${totalFindings} issue${totalFindings === 1 ? '' : 's'} require attention.`}
           </p>
           <p className="hero-meta">
-            Profiler version {report.profiler_version} • scoring {report.health_score.scoring_version}
+            {isHistorical ? 'Saved report • ' : ''}Profiler version {report.profiler_version} • scoring {report.health_score.scoring_version}
           </p>
         </div>
       </section>

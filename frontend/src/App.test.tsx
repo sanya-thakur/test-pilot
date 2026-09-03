@@ -1,22 +1,53 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
+import type { PersistedDataset } from './types/profiler';
 
 const mockUploadDataset = vi.fn();
+const mockGetDatasetHistory = vi.fn();
+const mockGetDatasetById = vi.fn();
+
+const savedDataset = {
+  id: 'saved-dataset-1',
+  originalFilename: 'customers.csv',
+  createdAt: '2026-09-02T10:30:00.000Z',
+  healthScore: 88,
+  profilerVersion: 'testpilot-profiler-v1',
+};
+
+const savedReport: PersistedDataset = {
+  ...savedDataset,
+  storedFilename: 'generated.csv',
+  report: {
+    profiler_version: 'testpilot-profiler-v1',
+    file_summary: {
+      file_sha256: 'saved-hash', size_bytes: 256, row_count: 12, column_count: 3,
+      duplicate_row_count: 1, encoding: 'utf-8', delimiter: ',', header_quality: 'good'
+    },
+    health_score: { score: 88, deductions: { duplicate_rows: 12 }, scoring_version: 'score-v1' },
+    severity_totals: { info: 0, warning: 1, error: 0 },
+    findings: [{ rule_id: 'duplicate_rows.v1', severity: 'warning', column: null, metrics: {} }],
+    column_profiles: [],
+  },
+};
 
 vi.mock('./services/api', () => ({
   uploadDataset: (...args: unknown[]) => mockUploadDataset(...args),
+  getDatasetHistory: (...args: unknown[]) => mockGetDatasetHistory(...args),
+  getDatasetById: (...args: unknown[]) => mockGetDatasetById(...args),
 }));
 
 describe('TestPilot app', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetDatasetHistory.mockResolvedValue([]);
   });
 
-  it('renders the upload panel', () => {
+  it('renders the upload panel', async () => {
     render(<App />);
     expect(screen.getByText(/Data Quality & Testing/i)).toBeInTheDocument();
     expect(screen.getByText(/Analyze your CSV/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No saved datasets yet/i)).toBeInTheDocument();
   });
 
   it('rejects invalid non-CSV file selection', async () => {
@@ -224,5 +255,70 @@ describe('TestPilot app', () => {
     await userEvent.click(screen.getByRole('button', { name: /Analyze another dataset/i }));
 
     expect(screen.getByText(/Analyze your CSV/i)).toBeInTheDocument();
+  });
+
+  it('shows a loading state while fetching history', () => {
+    mockGetDatasetHistory.mockImplementation(() => new Promise(() => undefined));
+    render(<App />);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading saved datasets');
+  });
+
+  it('shows an empty history state', async () => {
+    render(<App />);
+    expect(await screen.findByText(/No saved datasets yet/i)).toBeInTheDocument();
+  });
+
+  it('shows a history API error with a retry action', async () => {
+    mockGetDatasetHistory.mockRejectedValueOnce(new Error('History service unavailable'));
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('History service unavailable');
+    expect(screen.getByRole('button', { name: /Try again/i })).toBeInTheDocument();
+  });
+
+  it('loads and displays a saved report when a history item is selected', async () => {
+    mockGetDatasetHistory.mockResolvedValueOnce([savedDataset]);
+    let resolveReport: (dataset: PersistedDataset) => void = () => undefined;
+    mockGetDatasetById.mockImplementationOnce(() => new Promise<PersistedDataset>((resolve) => {
+      resolveReport = resolve;
+    }));
+    render(<App />);
+
+    const historyItem = await screen.findByRole('button', { name: /Open saved dataset customers.csv/i });
+    await userEvent.click(historyItem);
+
+    expect(await screen.findByText(/Loading saved report/i)).toBeInTheDocument();
+    resolveReport(savedReport);
+    expect(await screen.findByText('customers.csv')).toBeInTheDocument();
+    expect(screen.getByText('Saved Dataset')).toBeInTheDocument();
+    expect(screen.getByText(/Saved report/i)).toBeInTheDocument();
+    expect(mockGetDatasetById).toHaveBeenCalledWith('saved-dataset-1');
+  });
+
+  it('shows an error when a saved report cannot be loaded', async () => {
+    mockGetDatasetHistory.mockResolvedValueOnce([savedDataset]);
+    mockGetDatasetById.mockRejectedValueOnce(new Error('Saved report not found'));
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Open saved dataset customers.csv/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Saved report not found');
+    expect(screen.getByText(/Report unavailable/i)).toBeInTheDocument();
+  });
+
+  it('refreshes history after a successful upload', async () => {
+    mockGetDatasetHistory
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([savedDataset]);
+    mockUploadDataset.mockResolvedValueOnce({
+      ...savedReport.report,
+      datasetId: savedDataset.id,
+    });
+    render(<App />);
+
+    const input = screen.getByLabelText(/Choose a CSV file/i);
+    await userEvent.upload(input, new File(['id\n1\n'], 'customers.csv', { type: 'text/csv' }));
+    await userEvent.click(screen.getByRole('button', { name: /Analyze dataset/i }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Open saved dataset customers.csv/i })).toBeInTheDocument());
+    expect(mockGetDatasetHistory).toHaveBeenCalledTimes(2);
   });
 });
