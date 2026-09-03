@@ -41,6 +41,19 @@ export class LocalDatasetRepository implements DatasetRepository {
     }));
   }
 
+  async delete(id: string): Promise<boolean> {
+    const datasets = await this.readDatasets();
+    const index = datasets.findIndex((dataset) => dataset.id === id);
+
+    if (index === -1) {
+      return false;
+    }
+
+    datasets.splice(index, 1);
+    await this.writeDatasets(datasets);
+    return true;
+  }
+
   private async readDatasets(): Promise<DatasetRecord[]> {
     try {
       const contents = await fs.readFile(this.storagePath, 'utf8');
