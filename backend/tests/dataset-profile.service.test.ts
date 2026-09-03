@@ -59,4 +59,19 @@ describe('DatasetProfileService', () => {
     await expect(invalidService.profileDataset('test-path.csv', { originalFilename: 'a.csv', storedFilename: 'b.csv' })).rejects.toThrow('invalid response');
     expect(create).not.toHaveBeenCalled();
   });
+
+  it('deletes datasets through the repository', async () => {
+    const repository = { delete: jest.fn().mockResolvedValue(true) } as unknown as DatasetRepository;
+    const service = new DatasetProfileService({ profile: jest.fn() } as any, repository);
+
+    await expect(service.deleteDataset('dataset-id')).resolves.toBe(true);
+    expect(repository.delete).toHaveBeenCalledWith('dataset-id');
+  });
+
+  it('returns not-found deletion results from the repository', async () => {
+    const repository = { delete: jest.fn().mockResolvedValue(false) } as unknown as DatasetRepository;
+    const service = new DatasetProfileService({ profile: jest.fn() } as any, repository);
+
+    await expect(service.deleteDataset('missing-id')).resolves.toBe(false);
+  });
 });

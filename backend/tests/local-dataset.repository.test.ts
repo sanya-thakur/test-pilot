@@ -57,4 +57,32 @@ describe('LocalDatasetRepository', () => {
       profilerVersion: 'testpilot-profiler-v1',
     }]);
   });
+
+  it('deletes an existing dataset and preserves other datasets', async () => {
+    const first = await repository.create({
+      originalFilename: 'first.csv', storedFilename: 'first-safe.csv',
+      profilerVersion: report.profiler_version, healthScore: report.health_score.score, report,
+    });
+    const second = await repository.create({
+      originalFilename: 'second.csv', storedFilename: 'second-safe.csv',
+      profilerVersion: report.profiler_version, healthScore: report.health_score.score, report,
+    });
+
+    await expect(repository.delete(first.id)).resolves.toBe(true);
+    await expect(repository.findById(first.id)).resolves.toBeNull();
+    await expect(repository.findById(second.id)).resolves.toEqual(second);
+    await expect(repository.delete('missing')).resolves.toBe(false);
+  });
+
+  it('deleting the final dataset leaves valid empty storage', async () => {
+    const dataset = await repository.create({
+      originalFilename: 'only.csv', storedFilename: 'only-safe.csv',
+      profilerVersion: report.profiler_version, healthScore: report.health_score.score, report,
+    });
+
+    await expect(repository.delete(dataset.id)).resolves.toBe(true);
+    await expect(repository.list()).resolves.toEqual([]);
+    await expect(fs.readFile(path.join(temporaryDirectory, 'nested', 'datasets.json'), 'utf8'))
+      .resolves.toBe('[]');
+  });
 });

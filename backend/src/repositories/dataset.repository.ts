@@ -22,4 +22,5 @@ export interface DatasetRepository {
   create(dataset: Omit<DatasetRecord, 'id' | 'createdAt'> & Partial<Pick<DatasetRecord, 'id' | 'createdAt'>>): Promise<DatasetRecord>;
   findById(id: string): Promise<DatasetRecord | null>;
   list(): Promise<DatasetSummary[]>;
+  delete(id: string): Promise<boolean>;
 }

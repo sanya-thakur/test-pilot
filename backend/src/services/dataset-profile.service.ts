@@ -41,6 +41,10 @@ export class DatasetProfileService {
   async list(): Promise<Awaited<ReturnType<DatasetRepository['list']>>> {
     return this.datasetRepository.list();
   }
+
+  async deleteDataset(id: string): Promise<boolean> {
+    return this.datasetRepository.delete(id);
+  }
 }
 
 export const datasetProfileService = new DatasetProfileService();

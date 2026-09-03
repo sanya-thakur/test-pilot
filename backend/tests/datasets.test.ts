@@ -13,7 +13,8 @@ jest.mock('../src/services/dataset-profile.service', () => ({
   datasetProfileService: {
     profileDataset: jest.fn(),
     findById: jest.fn(),
-    list: jest.fn()
+    list: jest.fn(),
+    deleteDataset: jest.fn()
   }
 }));
 
@@ -130,5 +131,34 @@ describe('GET /api/v1/datasets', () => {
     const res = await request(app).get('/api/v1/datasets');
     expect(res.status).toBe(200);
     expect(res.body).toEqual([{ id: 'dataset-id', originalFilename: 'test.csv', createdAt: '2026-01-01T00:00:00.000Z', healthScore: 85, profilerVersion: 'testpilot-profiler-v1' }]);
+  });
+
+  it('returns the existing dataset and preserves GET behavior', async () => {
+    const res = await request(app).get('/api/v1/datasets/dataset-id');
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe('dataset-id');
+  });
+});
+
+describe('DELETE /api/v1/datasets/:id', () => {
+  beforeEach(() => {
+    (datasetProfileService.deleteDataset as jest.Mock).mockResolvedValue(true);
+  });
+
+  it('returns 204 and delegates deletion for an existing dataset', async () => {
+    const res = await request(app).delete('/api/v1/datasets/dataset-id');
+
+    expect(res.status).toBe(204);
+    expect(res.text).toBe('');
+    expect(datasetProfileService.deleteDataset).toHaveBeenCalledWith('dataset-id');
+  });
+
+  it('returns 404 for a nonexistent dataset', async () => {
+    (datasetProfileService.deleteDataset as jest.Mock).mockResolvedValueOnce(false);
+
+    const res = await request(app).delete('/api/v1/datasets/missing');
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'Dataset not found' });
   });
 });
