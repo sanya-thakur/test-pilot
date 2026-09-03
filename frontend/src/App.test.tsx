@@ -85,6 +85,7 @@ describe('TestPilot app', () => {
 
   it('renders a successful health report', async () => {
     mockUploadDataset.mockResolvedValue({
+      datasetId: 'uploaded-dataset-1',
       profiler_version: 'testpilot-profiler-v1',
       file_summary: {
         file_sha256: 'abc',
@@ -129,6 +130,8 @@ describe('TestPilot app', () => {
     await userEvent.click(screen.getByRole('button', { name: /Analyze dataset/i }));
 
     expect(await screen.findByText('96')).toBeInTheDocument();
+    expect(screen.getByText(/Current upload/i)).toBeInTheDocument();
+    expect(screen.getByText(/Dataset ID uploaded-dataset-1/i)).toBeInTheDocument();
     expect(screen.getAllByText(/missing_values.v1/i).length).toBeGreaterThan(0);
   });
 
@@ -276,7 +279,7 @@ describe('TestPilot app', () => {
   });
 
   it('loads and displays a saved report when a history item is selected', async () => {
-    mockGetDatasetHistory.mockResolvedValueOnce([savedDataset]);
+    mockGetDatasetHistory.mockResolvedValue([savedDataset]);
     let resolveReport: (dataset: PersistedDataset) => void = () => undefined;
     mockGetDatasetById.mockImplementationOnce(() => new Promise<PersistedDataset>((resolve) => {
       resolveReport = resolve;
@@ -290,8 +293,21 @@ describe('TestPilot app', () => {
     resolveReport(savedReport);
     expect(await screen.findByText('customers.csv')).toBeInTheDocument();
     expect(screen.getByText('Saved Dataset')).toBeInTheDocument();
-    expect(screen.getByText(/Saved report/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Saved report/i).length).toBeGreaterThan(0);
     expect(mockGetDatasetById).toHaveBeenCalledWith('saved-dataset-1');
+  });
+
+  it('returns from a historical report to the history and upload view', async () => {
+    mockGetDatasetHistory.mockResolvedValue([savedDataset]);
+    mockGetDatasetById.mockResolvedValueOnce(savedReport);
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Open saved dataset customers.csv/i }));
+    await screen.findByText('Saved Dataset');
+    await userEvent.click(screen.getByRole('button', { name: /Back to history/i }));
+
+    expect(screen.getByText(/Analyze your CSV/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open saved dataset customers.csv/i })).toBeInTheDocument();
   });
 
   it('shows an error when a saved report cannot be loaded', async () => {
