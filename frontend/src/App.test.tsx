@@ -6,6 +6,7 @@ import type { PersistedDataset } from './types/profiler';
 const mockUploadDataset = vi.fn();
 const mockGetDatasetHistory = vi.fn();
 const mockGetDatasetById = vi.fn();
+const mockDeleteDataset = vi.fn();
 
 const savedDataset = {
   id: 'saved-dataset-1',
@@ -35,12 +36,14 @@ vi.mock('./services/api', () => ({
   uploadDataset: (...args: unknown[]) => mockUploadDataset(...args),
   getDatasetHistory: (...args: unknown[]) => mockGetDatasetHistory(...args),
   getDatasetById: (...args: unknown[]) => mockGetDatasetById(...args),
+  deleteDataset: (...args: unknown[]) => mockDeleteDataset(...args),
 }));
 
 describe('TestPilot app', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetDatasetHistory.mockResolvedValue([]);
+    mockDeleteDataset.mockResolvedValue(undefined);
   });
 
   it('renders the upload panel', async () => {
@@ -336,5 +339,72 @@ describe('TestPilot app', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: /Open saved dataset customers.csv/i })).toBeInTheDocument());
     expect(mockGetDatasetHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders a delete action and opens a confirmation dialog', async () => {
+    mockGetDatasetHistory.mockResolvedValue([savedDataset]);
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Delete dataset customers.csv/i }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('cannot be undone');
+    expect(screen.getByRole('button', { name: /Cancel/i })).toHaveFocus();
+  });
+
+  it('cancels deletion without calling the API', async () => {
+    mockGetDatasetHistory.mockResolvedValue([savedDataset]);
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Delete dataset customers.csv/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Cancel/i }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(mockDeleteDataset).not.toHaveBeenCalled();
+  });
+
+  it('deletes a non-active dataset and refreshes history', async () => {
+    const otherDataset = { ...savedDataset, id: 'saved-dataset-2', originalFilename: 'orders.csv' };
+    let deletionFinished = false;
+    mockGetDatasetHistory.mockImplementation(() => Promise.resolve(deletionFinished ? [savedDataset] : [savedDataset, otherDataset]));
+    mockDeleteDataset.mockImplementationOnce(async () => {
+      deletionFinished = true;
+    });
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Delete dataset orders.csv/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Delete dataset$/i }));
+
+    await waitFor(() => expect(mockDeleteDataset).toHaveBeenCalledWith('saved-dataset-2'));
+    expect(screen.queryByRole('button', { name: /Delete dataset orders.csv/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open saved dataset customers.csv/i })).toBeInTheDocument();
+  });
+
+  it('clears the active historical report when it is deleted', async () => {
+    mockGetDatasetHistory.mockResolvedValue([savedDataset]);
+    mockGetDatasetById.mockResolvedValue(savedReport);
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Open saved dataset customers.csv/i }));
+    expect(await screen.findByText('Saved Dataset')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Delete dataset customers.csv/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Delete dataset$/i }));
+
+    await waitFor(() => expect(mockDeleteDataset).toHaveBeenCalledWith('saved-dataset-1'));
+    expect(screen.getByText(/Analyze your CSV/i)).toBeInTheDocument();
+    expect(screen.queryByText('Saved Dataset')).not.toBeInTheDocument();
+  });
+
+  it('shows a deletion loading state and surfaces deletion errors', async () => {
+    let rejectDeletion: (error: Error) => void = () => undefined;
+    mockGetDatasetHistory.mockResolvedValue([savedDataset]);
+    mockDeleteDataset.mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectDeletion = reject; }));
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Delete dataset customers.csv/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Delete dataset$/i }));
+    expect(screen.getByRole('button', { name: /Deleting/i })).toBeDisabled();
+    rejectDeletion(new Error('Delete request failed'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete request failed');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
