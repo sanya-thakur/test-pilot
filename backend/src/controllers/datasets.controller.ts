@@ -26,7 +26,10 @@ export const uploadDataset = async (req: Request, res: Response): Promise<void> 
     }
 
     // Call service to get profiler report
-    const report = await datasetProfileService.profileDataset(filePath);
+    const report = await datasetProfileService.profileDataset(filePath, {
+      originalFilename: req.file.originalname,
+      storedFilename: req.file.filename,
+    });
 
     res.status(200).json(report);
   } catch (err) {
