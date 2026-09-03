@@ -18,7 +18,7 @@ const scoreTone = (score: number) => score >= 90 ? 'healthy' : score >= 60 ? 'wa
 
 export function DatasetHistory({ datasets, selectedId, isLoading, error, onSelect, onRetry }: DatasetHistoryProps) {
   return (
-    <aside className="history-panel panel" aria-labelledby="dataset-history-title">
+    <aside id="dataset-history" className="history-panel panel" aria-labelledby="dataset-history-title">
       <div className="history-heading">
         <div>
           <p className="eyebrow">Library</p>
