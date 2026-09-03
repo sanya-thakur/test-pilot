@@ -64,6 +64,16 @@ export async function getDatasetById(id: string): Promise<PersistedDataset> {
   return data;
 }
 
+export async function deleteDataset(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/datasets/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, 'The dataset could not be deleted.'));
+  }
+}
+
 export async function getHealthStatus(): Promise<{ status: string; service: string }> {
   const response = await fetch(`${API_BASE_URL}/api/v1/health`);
 

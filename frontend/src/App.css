@@ -107,16 +107,27 @@
 
 .history-item {
   display: grid;
-  gap: 7px;
+  gap: 10px;
   width: 100%;
   padding: 13px;
   border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 14px;
   background: rgba(15, 23, 42, 0.52);
   color: #e2e8f0;
-  cursor: pointer;
   text-align: left;
   transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.history-open-button {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
 }
 
 .history-item:hover {
@@ -170,6 +181,76 @@
 .score-chip.healthy { background: rgba(16, 185, 129, 0.16); color: #bbf7d0; }
 .score-chip.warning { background: rgba(245, 158, 11, 0.16); color: #fde68a; }
 .score-chip.error { background: rgba(239, 68, 68, 0.16); color: #fecaca; }
+
+.delete-button {
+  justify-self: start;
+  padding: 4px 8px;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  border-radius: 7px;
+  background: transparent;
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.delete-button:hover {
+  border-color: rgba(248, 113, 113, 0.58);
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.72);
+}
+
+.confirmation-modal {
+  width: min(100%, 440px);
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  border-radius: 18px;
+  background: #0f172a;
+  box-shadow: 0 24px 70px rgba(2, 6, 23, 0.55);
+}
+
+.confirmation-modal h2 {
+  font-size: 1.45rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.danger-button {
+  padding: 0.85rem 1.1rem;
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  border-radius: 12px;
+  background: rgba(185, 28, 28, 0.78);
+  color: #fff1f2;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.9);
+}
+
+.delete-button:focus-visible,
+.danger-button:focus-visible,
+.history-open-button:focus-visible {
+  outline: 3px solid rgba(125, 211, 252, 0.8);
+  outline-offset: 3px;
+}
 
 .history-state,
 .content-state {

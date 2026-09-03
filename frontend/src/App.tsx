@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { UploadPanel } from './components/UploadPanel';
 import { HealthReport } from './components/HealthReport';
 import { DatasetHistory } from './components/DatasetHistory';
-import { getDatasetById, getDatasetHistory, uploadDataset } from './services/api';
+import { deleteDataset, getDatasetById, getDatasetHistory, uploadDataset } from './services/api';
 import type { DatasetSummary, ProfilerResponse } from './types/profiler';
 
 function App() {
@@ -91,6 +91,19 @@ function App() {
     }
   };
 
+  const handleDeleteDataset = async (dataset: DatasetSummary) => {
+    await deleteDataset(dataset.id);
+    setHistory((current) => current.filter((item) => item.id !== dataset.id));
+    if (selectedDatasetId === dataset.id) {
+      setReport(null);
+      setSelectedDatasetId(null);
+      setSelectedDatasetName(null);
+      setReportMode(null);
+      setReportError(null);
+    }
+    await refreshHistory();
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -111,6 +124,7 @@ function App() {
             isLoading={isHistoryLoading}
             error={historyError}
             onSelect={handleHistorySelect}
+            onDelete={handleDeleteDataset}
             onRetry={() => void refreshHistory()}
           />
           <section className="content-column">
