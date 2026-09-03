@@ -40,6 +40,19 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  try {
+    const deleted = await datasetProfileService.deleteDataset(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: 'Dataset not found' });
+      return;
+    }
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error while deleting dataset' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const dataset = await datasetProfileService.findById(req.params.id);
