@@ -15,6 +15,7 @@ function App() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
   const [selectedDatasetName, setSelectedDatasetName] = useState<string | null>(null);
+  const [reportMode, setReportMode] = useState<'current' | 'historical' | null>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
 
@@ -50,6 +51,7 @@ function App() {
       setReport(nextReport);
       setSelectedDatasetId(nextReport.datasetId);
       setSelectedDatasetName(selectedFile.name);
+      setReportMode('current');
       setReportError(null);
       await refreshHistory();
     } catch (uploadError) {
@@ -67,12 +69,14 @@ function App() {
     setError(null);
     setSelectedDatasetId(null);
     setSelectedDatasetName(null);
+    setReportMode(null);
     setReportError(null);
   };
 
   const handleHistorySelect = async (dataset: DatasetSummary) => {
     setSelectedDatasetId(dataset.id);
     setSelectedDatasetName(dataset.originalFilename);
+    setReportMode('historical');
     setReport(null);
     setReportError(null);
     setIsReportLoading(true);
@@ -133,7 +137,8 @@ function App() {
                 onReset={handleReset}
                 datasetId={selectedDatasetId ?? undefined}
                 datasetName={selectedDatasetName ?? undefined}
-                isHistorical={Boolean(selectedDatasetId)}
+                isHistorical={reportMode === 'historical'}
+                onBackToHistory={handleReset}
               />
             )}
           </section>

@@ -374,6 +374,15 @@ h3 {
   box-shadow: none;
 }
 
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.ghost-button:focus-visible,
+.column-toggle:focus-visible,
+.history-item:focus-visible {
+  outline: 3px solid rgba(125, 211, 252, 0.8);
+  outline-offset: 3px;
+}
+
 .secondary-button,
 .ghost-button {
   background: rgba(148, 163, 184, 0.08);
@@ -419,6 +428,26 @@ h3 {
 .report-heading-group {
   display: grid;
   gap: 6px;
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.report-context-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.report-score-context {
+  color: #cbd5e1;
+  font-size: 0.82rem;
 }
 
 .hero-panel {
@@ -797,6 +826,11 @@ h3 {
 
   .hero-panel {
     gap: 16px;
+  }
+
+  .report-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .primary-button {
