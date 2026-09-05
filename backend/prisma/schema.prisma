@@ -1,0 +1,36 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model DatasetRecord {
+  id                    String   @id @default(uuid())
+  originalFilename      String   @map("original_filename")
+  storedFilename        String   @map("stored_filename")
+  fileSha256            String   @map("file_sha256")
+  sizeBytes             BigInt   @map("size_bytes")
+  rowCount              Int      @map("row_count")
+  columnCount           Int      @map("column_count")
+  duplicateRowCount     Int      @map("duplicate_row_count")
+  encoding              String
+  delimiter             String
+  headerQuality         String   @map("header_quality")
+  healthScore           Int      @map("health_score")
+  healthScoreDeductions Json     @map("health_score_deductions")
+  scoringVersion        String   @map("scoring_version")
+  severityTotals        Json     @map("severity_totals")
+  findings              Json
+  columnProfiles        Json     @map("column_profiles")
+  profilerVersion       String   @map("profiler_version")
+  report                Json     @map("report")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("dataset_records")
+  @@index([fileSha256])
+  @@index([createdAt])
+}
