@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { v4 as uuidv4 } from 'crypto';
+import { randomUUID } from 'crypto';
 import {
   DatasetRecord,
   DatasetSummary,
@@ -50,7 +50,7 @@ export class LocalDatasetRepository implements IDatasetRepository {
     const now = new Date();
 
     const record: DatasetRecord = {
-      id: (typeof uuidv4 === 'function' ? uuidv4() : Math.random().toString(36).substring(2, 11)),
+      id: randomUUID(),
       originalFilename: input.originalFilename,
       storedFilename: input.storedFilename,
       fileSha256: input.report.file_summary.file_sha256,

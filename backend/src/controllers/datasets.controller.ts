@@ -63,7 +63,7 @@ export const listDatasets = async (_req: Request, res: Response): Promise<void> 
 
 export const getDataset = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const dataset = await datasetProfileService.getDatasetRecord(id);
     if (!dataset) {
       res.status(404).json({ error: 'Dataset not found' });
@@ -77,7 +77,7 @@ export const getDataset = async (req: Request, res: Response): Promise<void> => 
 
 export const deleteDataset = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const success = await datasetProfileService.deleteDataset(id);
     if (!success) {
       res.status(404).json({ error: 'Dataset not found' });
