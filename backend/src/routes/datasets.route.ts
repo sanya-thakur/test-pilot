@@ -1,5 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { uploadDataset } from '../controllers/datasets.controller';
+import {
+  uploadDataset,
+  listDatasets,
+  getDataset,
+  deleteDataset,
+} from '../controllers/datasets.controller';
 import { uploadMiddleware } from '../storage/upload.storage';
 
 const router = Router();
@@ -22,7 +27,7 @@ const multerErrorHandler = (err: any, req: Request, res: Response, next: NextFun
 };
 
 router.post(
-  '/profile', 
+  '/profile',
   (req, res, next) => {
     uploadMiddleware.single('file')(req, res, (err) => {
       multerErrorHandler(err, req, res, next);
@@ -30,5 +35,9 @@ router.post(
   },
   uploadDataset
 );
+
+router.get('/', listDatasets);
+router.get('/:id', getDataset);
+router.delete('/:id', deleteDataset);
 
 export default router;
