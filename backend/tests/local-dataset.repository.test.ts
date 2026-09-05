@@ -1,81 +1,85 @@
-import fs from 'fs';
+import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
 import { LocalDatasetRepository } from '../src/repositories/local-dataset.repository';
-import { ProfilerResponseV1 } from '../src/contracts/profiler-response';
+import type { ProfilerResponseV1 } from '../src/contracts/profiler-response';
 
 describe('LocalDatasetRepository', () => {
-  const testDbPath = path.resolve(__dirname, 'tmp-datasets.json');
+  let temporaryDirectory: string;
   let repository: LocalDatasetRepository;
-
-  const mockReport: ProfilerResponseV1 = {
+  const report = {
     profiler_version: 'testpilot-profiler-v1',
-    file_summary: {
-      file_sha256: 'sha256_mock_123',
-      size_bytes: 512,
-      row_count: 20,
-      column_count: 5,
-      duplicate_row_count: 1,
-      encoding: 'utf-8',
-      delimiter: ',',
-      header_quality: 'good',
-    },
-    health_score: {
-      score: 95,
-      deductions: { DUP_ROWS: 5 },
-      scoring_version: 'score-v1',
-    },
-    severity_totals: { info: 1, warning: 1, error: 0 },
-    findings: [
-      {
-        rule_id: 'DUP_ROWS',
-        severity: 'warning',
-        column: null,
-        metrics: { count: 1 },
-      },
-    ],
+    file_summary: { file_sha256: 'hash', size_bytes: 10, row_count: 1, column_count: 1, duplicate_row_count: 0, encoding: 'utf-8', delimiter: ',', header_quality: 'good' },
+    health_score: { score: 90, deductions: {}, scoring_version: 'score-v1' },
+    severity_totals: { info: 0, warning: 0, error: 0 },
+    findings: [],
     column_profiles: [],
-  };
+  } satisfies ProfilerResponseV1;
 
-  beforeEach(() => {
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
-    repository = new LocalDatasetRepository(testDbPath);
+  beforeEach(async () => {
+    temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'testpilot-datasets-'));
+    repository = new LocalDatasetRepository(path.join(temporaryDirectory, 'nested', 'datasets.json'));
   });
 
-  afterEach(() => {
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+  afterEach(async () => {
+    await fs.rm(temporaryDirectory, { recursive: true, force: true });
   });
 
-  it('creates, lists, finds, and deletes dataset records locally', async () => {
-    const created = await repository.create({
-      originalFilename: 'sales.csv',
-      storedFilename: 'sales-123.csv',
-      report: mockReport,
+  it('initializes missing storage and creates a dataset with a UUID', async () => {
+    const dataset = await repository.create({
+      originalFilename: 'input.csv',
+      storedFilename: 'generated.csv',
+      profilerVersion: report.profiler_version,
+      healthScore: report.health_score.score,
+      report,
     });
 
-    expect(created.id).toBeDefined();
-    expect(created.originalFilename).toBe('sales.csv');
-    expect(created.healthScore).toBe(95);
+    expect(dataset.id).toMatch(/^[0-9a-f-]{36}$/);
+    await expect(fs.access(path.join(temporaryDirectory, 'nested', 'datasets.json'))).resolves.toBeUndefined();
+  });
 
+  it('retrieves existing datasets, returns null for missing IDs, and lists summaries', async () => {
+    const created = await repository.create({
+      originalFilename: 'input.csv',
+      storedFilename: 'generated.csv',
+      profilerVersion: report.profiler_version,
+      healthScore: report.health_score.score,
+      report,
+    });
+
+    await expect(repository.findById(created.id)).resolves.toEqual(created);
+    await expect(repository.findById('missing')).resolves.toBeNull();
     const list = await repository.list();
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe(created.id);
-    expect(list[0].originalFilename).toBe('sales.csv');
+    expect(list[0].originalFilename).toBe('input.csv');
+  });
 
-    const found = await repository.findById(created.id);
-    expect(found).not.toBeNull();
-    expect(found?.fileSha256).toBe('sha256_mock_123');
+  it('deletes an existing dataset and preserves other datasets', async () => {
+    const first = await repository.create({
+      originalFilename: 'first.csv', storedFilename: 'first-safe.csv',
+      profilerVersion: report.profiler_version, healthScore: report.health_score.score, report,
+    });
+    const second = await repository.create({
+      originalFilename: 'second.csv', storedFilename: 'second-safe.csv',
+      profilerVersion: report.profiler_version, healthScore: report.health_score.score, report,
+    });
 
-    const deleted = await repository.delete(created.id);
-    expect(deleted).toBe(true);
+    await expect(repository.delete(first.id)).resolves.toBe(true);
+    await expect(repository.findById(first.id)).resolves.toBeNull();
+    await expect(repository.findById(second.id)).resolves.toEqual(second);
+    await expect(repository.delete('missing')).resolves.toBe(false);
+  });
 
-    const listAfterDelete = await repository.list();
-    expect(listAfterDelete).toHaveLength(0);
+  it('deleting the final dataset leaves valid empty storage', async () => {
+    const dataset = await repository.create({
+      originalFilename: 'only.csv', storedFilename: 'only-safe.csv',
+      profilerVersion: report.profiler_version, healthScore: report.health_score.score, report,
+    });
 
-    const deleteNonExistent = await repository.delete('non-existent-id');
-    expect(deleteNonExistent).toBe(false);
+    await expect(repository.delete(dataset.id)).resolves.toBe(true);
+    await expect(repository.list()).resolves.toEqual([]);
+    await expect(fs.readFile(path.join(temporaryDirectory, 'nested', 'datasets.json'), 'utf8'))
+      .resolves.toBe('[]');
   });
 });

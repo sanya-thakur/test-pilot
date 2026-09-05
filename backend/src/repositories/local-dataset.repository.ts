@@ -1,112 +1,109 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
-import { randomUUID } from 'crypto';
-import {
-  DatasetRecord,
-  DatasetSummary,
-  CreateDatasetInput,
-  IDatasetRepository,
-} from './dataset.repository';
+import crypto from 'crypto';
+import type { DatasetRecord, DatasetRepository, DatasetSummary, CreateDatasetInput } from './dataset.repository';
 
-export class LocalDatasetRepository implements IDatasetRepository {
-  private filePath: string;
+const DEFAULT_STORAGE_PATH = path.resolve(__dirname, '../../..', 'data/datasets/datasets.json');
 
-  constructor(filePath?: string) {
-    this.filePath =
-      filePath || path.resolve(process.cwd(), 'data', 'datasets', 'datasets.json');
+export class LocalDatasetRepository implements DatasetRepository {
+  private readonly storagePath: string;
+
+  constructor(storagePath = process.env.DATASET_STORAGE_PATH || DEFAULT_STORAGE_PATH) {
+    this.storagePath = storagePath;
   }
 
-  private ensureDirectory(): void {
-    const dir = path.dirname(this.filePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+  async create(input: CreateDatasetInput | (Omit<DatasetRecord, 'id' | 'createdAt'> & Partial<Pick<DatasetRecord, 'id' | 'createdAt'>>)): Promise<DatasetRecord> {
+    const datasets = await this.readDatasets();
+
+    let record: DatasetRecord;
+    if ('report' in input && input.report && !('healthScore' in input)) {
+      const report = input.report;
+      record = {
+        id: crypto.randomUUID(),
+        originalFilename: input.originalFilename,
+        storedFilename: input.storedFilename,
+        createdAt: new Date().toISOString(),
+        profilerVersion: report.profiler_version,
+        healthScore: report.health_score.score,
+        report: report,
+        fileSha256: report.file_summary.file_sha256,
+        sizeBytes: report.file_summary.size_bytes,
+        rowCount: report.file_summary.row_count,
+        columnCount: report.file_summary.column_count,
+        duplicateRowCount: report.file_summary.duplicate_row_count,
+        encoding: report.file_summary.encoding,
+        delimiter: report.file_summary.delimiter,
+        headerQuality: report.file_summary.header_quality,
+        healthScoreDeductions: report.health_score.deductions,
+        scoringVersion: report.health_score.scoring_version,
+        severityTotals: report.severity_totals,
+        findings: report.findings,
+        columnProfiles: report.column_profiles,
+      };
+    } else {
+      const inputRecord = input as Omit<DatasetRecord, 'id' | 'createdAt'> & Partial<Pick<DatasetRecord, 'id' | 'createdAt'>>;
+      record = {
+        ...inputRecord,
+        id: inputRecord.id || crypto.randomUUID(),
+        createdAt: inputRecord.createdAt || new Date().toISOString(),
+      };
     }
-  }
 
-  private readRecords(): DatasetRecord[] {
-    if (!fs.existsSync(this.filePath)) {
-      return [];
-    }
-    try {
-      const raw = fs.readFileSync(this.filePath, 'utf-8');
-      const parsed = JSON.parse(raw);
-      return parsed.map((item: any) => ({
-        ...item,
-        createdAt: new Date(item.createdAt),
-        updatedAt: new Date(item.updatedAt),
-      }));
-    } catch {
-      return [];
-    }
-  }
-
-  private writeRecords(records: DatasetRecord[]): void {
-    this.ensureDirectory();
-    fs.writeFileSync(this.filePath, JSON.stringify(records, null, 2), 'utf-8');
-  }
-
-  async create(input: CreateDatasetInput): Promise<DatasetRecord> {
-    const records = this.readRecords();
-    const now = new Date();
-
-    const record: DatasetRecord = {
-      id: randomUUID(),
-      originalFilename: input.originalFilename,
-      storedFilename: input.storedFilename,
-      fileSha256: input.report.file_summary.file_sha256,
-      sizeBytes: input.report.file_summary.size_bytes,
-      rowCount: input.report.file_summary.row_count,
-      columnCount: input.report.file_summary.column_count,
-      duplicateRowCount: input.report.file_summary.duplicate_row_count,
-      encoding: input.report.file_summary.encoding,
-      delimiter: input.report.file_summary.delimiter,
-      headerQuality: input.report.file_summary.header_quality,
-      healthScore: input.report.health_score.score,
-      healthScoreDeductions: input.report.health_score.deductions,
-      scoringVersion: input.report.health_score.scoring_version,
-      severityTotals: input.report.severity_totals,
-      findings: input.report.findings,
-      columnProfiles: input.report.column_profiles,
-      profilerVersion: input.report.profiler_version,
-      report: input.report,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    records.push(record);
-    this.writeRecords(records);
+    datasets.push(record);
+    await this.writeDatasets(datasets);
     return record;
   }
 
   async findById(id: string): Promise<DatasetRecord | null> {
-    const records = this.readRecords();
-    const record = records.find((r) => r.id === id);
-    return record || null;
+    const datasets = await this.readDatasets();
+    return datasets.find((dataset) => dataset.id === id) || null;
   }
 
   async list(): Promise<DatasetSummary[]> {
-    const records = this.readRecords();
-    return records.map((r) => ({
-      id: r.id,
-      originalFilename: r.originalFilename,
-      storedFilename: r.storedFilename,
-      fileSha256: r.fileSha256,
-      sizeBytes: r.sizeBytes,
-      rowCount: r.rowCount,
-      columnCount: r.columnCount,
-      healthScore: r.healthScore,
-      createdAt: r.createdAt,
+    const datasets = await this.readDatasets();
+    return datasets.map((d) => ({
+      id: d.id,
+      originalFilename: d.originalFilename,
+      createdAt: d.createdAt,
+      healthScore: d.healthScore,
+      profilerVersion: d.profilerVersion,
+      storedFilename: d.storedFilename,
+      fileSha256: d.fileSha256,
+      sizeBytes: d.sizeBytes,
+      rowCount: d.rowCount,
+      columnCount: d.columnCount,
     }));
   }
 
   async delete(id: string): Promise<boolean> {
-    const records = this.readRecords();
-    const index = records.findIndex((r) => r.id === id);
+    const datasets = await this.readDatasets();
+    const index = datasets.findIndex((dataset) => dataset.id === id);
+
     if (index === -1) {
       return false;
     }
-    records.splice(index, 1);
-    this.writeRecords(records);
+
+    datasets.splice(index, 1);
+    await this.writeDatasets(datasets);
     return true;
+  }
+
+  private async readDatasets(): Promise<DatasetRecord[]> {
+    try {
+      const contents = await fs.readFile(this.storagePath, 'utf8');
+      const parsed: unknown = JSON.parse(contents);
+      return Array.isArray(parsed) ? (parsed as DatasetRecord[]) : [];
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        await this.writeDatasets([]);
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  private async writeDatasets(datasets: DatasetRecord[]): Promise<void> {
+    await fs.mkdir(path.dirname(this.storagePath), { recursive: true });
+    await fs.writeFile(this.storagePath, JSON.stringify(datasets, null, 2), 'utf8');
   }
 }

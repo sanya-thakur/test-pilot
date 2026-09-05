@@ -51,6 +51,23 @@ export interface ProfilerResponse {
   column_profiles: ColumnProfile[];
 }
 
+export interface DatasetSummary {
+  id: string;
+  originalFilename: string;
+  createdAt: string;
+  healthScore: number;
+  profilerVersion: string;
+}
+
+export interface PersistedDataset extends DatasetSummary {
+  storedFilename: string;
+  report: ProfilerResponse;
+}
+
+export interface UploadedProfilerResponse extends ProfilerResponse {
+  datasetId: string;
+}
+
 export interface ApiErrorResponse {
   error: string | { message?: string; code?: string };
 }

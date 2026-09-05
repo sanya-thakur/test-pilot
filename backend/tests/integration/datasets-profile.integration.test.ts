@@ -1,8 +1,12 @@
 import request from 'supertest';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import axios from 'axios';
-import app from '../../src/app';
+
+const temporaryStoragePath = path.join(os.tmpdir(), `testpilot-datasets-integration-${process.pid}.json`);
+process.env.DATASET_STORAGE_PATH = temporaryStoragePath;
+const app = require('../../src/app').default;
 
 const fixturePath = path.resolve(__dirname, '../../../data-engine/app/tests/fixtures/normal.csv');
 const uploadDir = path.resolve(__dirname, '../../..', 'data/uploads');
@@ -50,6 +54,12 @@ describe('Express dataset profile integration', () => {
 
   afterEach(() => {
     cleanupUploadedFiles();
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(temporaryStoragePath)) {
+      fs.unlinkSync(temporaryStoragePath);
+    }
   });
 
   it('profiles a real CSV through Express, service, FastAPI, and contract validation', async () => {

@@ -37,7 +37,7 @@ router.post(
 );
 
 router.get('/', listDatasets);
-router.get('/:id', getDataset);
 router.delete('/:id', deleteDataset);
+router.get('/:id', getDataset);
 
 export default router;

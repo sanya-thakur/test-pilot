@@ -26,8 +26,10 @@ export const uploadDataset = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Call service to get profiler report and persist record
-    const report = await datasetProfileService.profileDataset(filePath, originalFilename);
+    const report = await datasetProfileService.profileDataset(filePath, {
+      originalFilename: req.file.originalname,
+      storedFilename: req.file.filename || originalFilename,
+    });
 
     res.status(200).json(report);
   } catch (err) {
@@ -54,7 +56,7 @@ export const uploadDataset = async (req: Request, res: Response): Promise<void> 
 
 export const listDatasets = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const datasets = await datasetProfileService.listDatasets();
+    const datasets = await datasetProfileService.list();
     res.status(200).json(datasets);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error listing datasets' });
@@ -64,7 +66,7 @@ export const listDatasets = async (_req: Request, res: Response): Promise<void> 
 export const getDataset = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const dataset = await datasetProfileService.getDatasetRecord(id);
+    const dataset = await datasetProfileService.findById(id);
     if (!dataset) {
       res.status(404).json({ error: 'Dataset not found' });
       return;
@@ -74,6 +76,8 @@ export const getDataset = async (req: Request, res: Response): Promise<void> => 
     res.status(500).json({ error: 'Internal server error retrieving dataset' });
   }
 };
+
+export const getDatasetById = getDataset;
 
 export const deleteDataset = async (req: Request, res: Response): Promise<void> => {
   try {

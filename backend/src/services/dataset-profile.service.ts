@@ -1,52 +1,90 @@
 import path from 'path';
 import { FastAPIProfilerClient } from '../clients/fastapi-profiler.client';
-import { IDatasetRepository, DatasetRecord, DatasetSummary } from '../repositories/dataset.repository';
+import type { DatasetRecord, DatasetRepository, DatasetSummary } from '../repositories/dataset.repository';
 import { LocalDatasetRepository } from '../repositories/local-dataset.repository';
 import { PostgresDatasetRepository } from '../repositories/postgres-dataset.repository';
-import { ProfilerResponseV1 } from '../contracts/profiler-response';
+import type { ProfilerResponseV1 } from '../contracts/profiler-response';
+
+export interface DatasetUploadMetadata {
+  originalFilename: string;
+  storedFilename: string;
+}
+
+export type ProfiledDatasetResponse = ProfilerResponseV1 & { datasetId?: string };
 
 export class DatasetProfileService {
   private profilerClient: FastAPIProfilerClient;
-  private repository: IDatasetRepository;
+  private datasetRepository: DatasetRepository;
 
-  constructor(repository?: IDatasetRepository, profilerClient?: FastAPIProfilerClient) {
+  constructor(
+    profilerClient?: FastAPIProfilerClient,
+    datasetRepository?: DatasetRepository
+  ) {
     this.profilerClient = profilerClient || new FastAPIProfilerClient();
-    if (repository) {
-      this.repository = repository;
+    if (datasetRepository) {
+      this.datasetRepository = datasetRepository;
     } else {
       const repoType = process.env.DATASET_REPOSITORY || 'local';
-      this.repository =
+      this.datasetRepository =
         repoType === 'postgres'
           ? new PostgresDatasetRepository()
           : new LocalDatasetRepository();
     }
   }
 
-  async profileDataset(filePath: string, originalFilename?: string): Promise<ProfilerResponseV1> {
+  async profileDataset(
+    filePath: string,
+    metadataOrFilename?: DatasetUploadMetadata | string
+  ): Promise<ProfilerResponseV1 | ProfiledDatasetResponse> {
     const report = await this.profilerClient.profile(filePath);
-    const filename = originalFilename || path.basename(filePath);
-    await this.repository.create({
-      originalFilename: filename,
-      storedFilename: path.basename(filePath),
+
+    let metadata: DatasetUploadMetadata | undefined;
+    if (typeof metadataOrFilename === 'string') {
+      metadata = {
+        originalFilename: metadataOrFilename,
+        storedFilename: path.basename(filePath),
+      };
+    } else if (metadataOrFilename) {
+      metadata = metadataOrFilename;
+    }
+
+    if (!metadata) {
+      return report;
+    }
+
+    const dataset: DatasetRecord = await this.datasetRepository.create({
+      originalFilename: metadata.originalFilename,
+      storedFilename: metadata.storedFilename,
+      profilerVersion: report.profiler_version,
+      healthScore: report.health_score.score,
       report,
     });
-    return report;
+
+    return { ...report, datasetId: dataset.id };
+  }
+
+  async findById(id: string): Promise<DatasetRecord | null> {
+    return this.datasetRepository.findById(id);
   }
 
   async getDatasetRecord(id: string): Promise<DatasetRecord | null> {
-    return this.repository.findById(id);
+    return this.findById(id);
+  }
+
+  async list(): Promise<DatasetSummary[]> {
+    return this.datasetRepository.list();
   }
 
   async listDatasets(): Promise<DatasetSummary[]> {
-    return this.repository.list();
+    return this.list();
   }
 
   async deleteDataset(id: string): Promise<boolean> {
-    return this.repository.delete(id);
+    return this.datasetRepository.delete(id);
   }
 
-  getRepository(): IDatasetRepository {
-    return this.repository;
+  getRepository(): DatasetRepository {
+    return this.datasetRepository;
   }
 }
 

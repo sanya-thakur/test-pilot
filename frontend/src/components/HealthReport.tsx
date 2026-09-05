@@ -4,6 +4,10 @@ import type { ProfilerResponse } from '../types/profiler';
 interface HealthReportProps {
   report: ProfilerResponse;
   onReset: () => void;
+  datasetId?: string;
+  datasetName?: string;
+  isHistorical?: boolean;
+  onBackToHistory: () => void;
 }
 
 const severityOrder = ['error', 'warning', 'info'] as const;
@@ -41,7 +45,7 @@ const formatFindingMessage = (finding: ProfilerResponse['findings'][number]) => 
   return `Data quality issue detected in ${finding.column} for ${finding.rule_id}.`;
 };
 
-export function HealthReport({ report, onReset }: HealthReportProps) {
+export function HealthReport({ report, onReset, datasetId, datasetName, isHistorical = false, onBackToHistory }: HealthReportProps) {
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
 
   const totalFindings = report.findings.length;
@@ -102,14 +106,22 @@ export function HealthReport({ report, onReset }: HealthReportProps) {
 
   return (
     <div className="report-shell">
-      <header className="report-header">
+      <header className="report-header" aria-label="Dataset report context">
         <div className="report-heading-group">
-          <p className="eyebrow">Dataset Health</p>
-          <h2>{report.file_summary.file_sha256 ? 'Uploaded dataset' : 'Dataset report'}</h2>
+          <p className="eyebrow">{isHistorical ? 'Saved Dataset' : 'Dataset Health'}</p>
+          <h2>{datasetName || (report.file_summary.file_sha256 ? 'Uploaded dataset' : 'Dataset report')}</h2>
+          {datasetId && <p className="report-id">Dataset ID {datasetId}</p>}
+          <div className="report-context-row">
+            <span className={`status-pill ${isHistorical ? 'info' : 'healthy'}`}>
+              {isHistorical ? 'Saved report' : 'Current upload'}
+            </span>
+            <span className="report-score-context">Health score {report.health_score.score}/100</span>
+          </div>
         </div>
-        <button type="button" className="secondary-button" onClick={onReset}>
-          Analyze another dataset
-        </button>
+        <div className="report-actions">
+          <button type="button" className="ghost-button" onClick={onBackToHistory}>Back to history</button>
+          <button type="button" className="secondary-button" onClick={onReset}>Analyze another dataset</button>
+        </div>
       </header>
 
       <section className="hero-panel">
@@ -133,7 +145,7 @@ export function HealthReport({ report, onReset }: HealthReportProps) {
               : `${totalFindings} issue${totalFindings === 1 ? '' : 's'} require attention.`}
           </p>
           <p className="hero-meta">
-            Profiler version {report.profiler_version} • scoring {report.health_score.scoring_version}
+            {isHistorical ? 'Saved report • ' : ''}Profiler version {report.profiler_version} • scoring {report.health_score.scoring_version}
           </p>
         </div>
       </section>

@@ -36,7 +36,7 @@ export class PostgresDatasetRepository implements IDatasetRepository {
       columnProfiles: dbRecord.columnProfiles as any[],
       profilerVersion: dbRecord.profilerVersion,
       report: dbRecord.report as ProfilerResponseV1,
-      createdAt: dbRecord.createdAt,
+      createdAt: typeof dbRecord.createdAt === 'string' ? dbRecord.createdAt : dbRecord.createdAt.toISOString(),
       updatedAt: dbRecord.updatedAt,
     };
   }
@@ -51,31 +51,32 @@ export class PostgresDatasetRepository implements IDatasetRepository {
       rowCount: dbRecord.rowCount,
       columnCount: dbRecord.columnCount,
       healthScore: dbRecord.healthScore,
-      createdAt: dbRecord.createdAt,
+      profilerVersion: dbRecord.profilerVersion,
+      createdAt: typeof dbRecord.createdAt === 'string' ? dbRecord.createdAt : dbRecord.createdAt.toISOString(),
     };
   }
 
-  async create(input: CreateDatasetInput): Promise<DatasetRecord> {
+  async create(input: CreateDatasetInput | (Omit<DatasetRecord, 'id' | 'createdAt'> & Partial<Pick<DatasetRecord, 'id' | 'createdAt'>>)): Promise<DatasetRecord> {
     const report = input.report;
     const dbRecord = await this.client.datasetRecord.create({
       data: {
         originalFilename: input.originalFilename,
         storedFilename: input.storedFilename,
-        fileSha256: report.file_summary.file_sha256,
-        sizeBytes: BigInt(report.file_summary.size_bytes),
-        rowCount: report.file_summary.row_count,
-        columnCount: report.file_summary.column_count,
-        duplicateRowCount: report.file_summary.duplicate_row_count,
-        encoding: report.file_summary.encoding,
-        delimiter: report.file_summary.delimiter,
-        headerQuality: report.file_summary.header_quality,
-        healthScore: report.health_score.score,
-        healthScoreDeductions: report.health_score.deductions as any,
-        scoringVersion: report.health_score.scoring_version,
-        severityTotals: report.severity_totals as any,
-        findings: report.findings as any,
-        columnProfiles: report.column_profiles as any,
-        profilerVersion: report.profiler_version,
+        fileSha256: report.file_summary?.file_sha256 || 'unknown',
+        sizeBytes: BigInt(report.file_summary?.size_bytes || 0),
+        rowCount: report.file_summary?.row_count || 0,
+        columnCount: report.file_summary?.column_count || 0,
+        duplicateRowCount: report.file_summary?.duplicate_row_count || 0,
+        encoding: report.file_summary?.encoding || 'utf-8',
+        delimiter: report.file_summary?.delimiter || ',',
+        headerQuality: report.file_summary?.header_quality || 'good',
+        healthScore: input.healthScore ?? report.health_score?.score ?? 100,
+        healthScoreDeductions: (report.health_score?.deductions || {}) as any,
+        scoringVersion: report.health_score?.scoring_version || 'v1',
+        severityTotals: (report.severity_totals || { info: 0, warning: 0, error: 0 }) as any,
+        findings: (report.findings || []) as any,
+        columnProfiles: (report.column_profiles || []) as any,
+        profilerVersion: input.profilerVersion || report.profiler_version || 'testpilot-profiler-v1',
         report: report as any,
       },
     });
