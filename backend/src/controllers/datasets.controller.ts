@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import fs from 'fs';
 import { datasetProfileService } from '../services/dataset-profile.service';
+import { aiReportContextService } from '../services/ai-report-context.service';
 import {
   ProfilerUnavailableError,
   ProfilerTimeoutError,
@@ -78,6 +79,20 @@ export const getDataset = async (req: Request, res: Response): Promise<void> => 
 };
 
 export const getDatasetById = getDataset;
+
+export const getDatasetAiContext = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const aiContext = await aiReportContextService.getAIReportContext(id);
+    if (!aiContext) {
+      res.status(404).json({ error: 'Dataset not found' });
+      return;
+    }
+    res.status(200).json(aiContext);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error retrieving AI report context' });
+  }
+};
 
 export const deleteDataset = async (req: Request, res: Response): Promise<void> => {
   try {
