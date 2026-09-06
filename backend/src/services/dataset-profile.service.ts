@@ -1,6 +1,8 @@
+import path from 'path';
 import { FastAPIProfilerClient } from '../clients/fastapi-profiler.client';
-import type { DatasetRecord, DatasetRepository } from '../repositories/dataset.repository';
+import type { DatasetRecord, DatasetRepository, DatasetSummary } from '../repositories/dataset.repository';
 import { LocalDatasetRepository } from '../repositories/local-dataset.repository';
+import { PostgresDatasetRepository } from '../repositories/postgres-dataset.repository';
 import type { ProfilerResponseV1 } from '../contracts/profiler-response';
 
 export interface DatasetUploadMetadata {
@@ -8,16 +10,43 @@ export interface DatasetUploadMetadata {
   storedFilename: string;
 }
 
-export type ProfiledDatasetResponse = ProfilerResponseV1 & { datasetId: string };
+export type ProfiledDatasetResponse = ProfilerResponseV1 & { datasetId?: string };
 
 export class DatasetProfileService {
-  constructor(
-    private readonly profilerClient: FastAPIProfilerClient = new FastAPIProfilerClient(),
-    private readonly datasetRepository: DatasetRepository = new LocalDatasetRepository()
-  ) {}
+  private profilerClient: FastAPIProfilerClient;
+  private datasetRepository: DatasetRepository;
 
-  async profileDataset(filePath: string, metadata?: DatasetUploadMetadata): Promise<ProfilerResponseV1 | ProfiledDatasetResponse> {
+  constructor(
+    profilerClient?: FastAPIProfilerClient,
+    datasetRepository?: DatasetRepository
+  ) {
+    this.profilerClient = profilerClient || new FastAPIProfilerClient();
+    if (datasetRepository) {
+      this.datasetRepository = datasetRepository;
+    } else {
+      const repoType = process.env.DATASET_REPOSITORY || 'local';
+      this.datasetRepository =
+        repoType === 'postgres'
+          ? new PostgresDatasetRepository()
+          : new LocalDatasetRepository();
+    }
+  }
+
+  async profileDataset(
+    filePath: string,
+    metadataOrFilename?: DatasetUploadMetadata | string
+  ): Promise<ProfilerResponseV1 | ProfiledDatasetResponse> {
     const report = await this.profilerClient.profile(filePath);
+
+    let metadata: DatasetUploadMetadata | undefined;
+    if (typeof metadataOrFilename === 'string') {
+      metadata = {
+        originalFilename: metadataOrFilename,
+        storedFilename: path.basename(filePath),
+      };
+    } else if (metadataOrFilename) {
+      metadata = metadataOrFilename;
+    }
 
     if (!metadata) {
       return report;
@@ -38,12 +67,24 @@ export class DatasetProfileService {
     return this.datasetRepository.findById(id);
   }
 
-  async list(): Promise<Awaited<ReturnType<DatasetRepository['list']>>> {
+  async getDatasetRecord(id: string): Promise<DatasetRecord | null> {
+    return this.findById(id);
+  }
+
+  async list(): Promise<DatasetSummary[]> {
     return this.datasetRepository.list();
+  }
+
+  async listDatasets(): Promise<DatasetSummary[]> {
+    return this.list();
   }
 
   async deleteDataset(id: string): Promise<boolean> {
     return this.datasetRepository.delete(id);
+  }
+
+  getRepository(): DatasetRepository {
+    return this.datasetRepository;
   }
 }
 

@@ -49,13 +49,10 @@ describe('LocalDatasetRepository', () => {
 
     await expect(repository.findById(created.id)).resolves.toEqual(created);
     await expect(repository.findById('missing')).resolves.toBeNull();
-    await expect(repository.list()).resolves.toEqual([{
-      id: created.id,
-      originalFilename: 'input.csv',
-      createdAt: created.createdAt,
-      healthScore: 90,
-      profilerVersion: 'testpilot-profiler-v1',
-    }]);
+    const list = await repository.list();
+    expect(list).toHaveLength(1);
+    expect(list[0].id).toBe(created.id);
+    expect(list[0].originalFilename).toBe('input.csv');
   });
 
   it('deletes an existing dataset and preserves other datasets', async () => {

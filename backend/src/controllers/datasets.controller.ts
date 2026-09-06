@@ -5,7 +5,7 @@ import {
   ProfilerUnavailableError,
   ProfilerTimeoutError,
   ProfilerHttpError,
-  ProfilerInvalidResponseError
+  ProfilerInvalidResponseError,
 } from '../clients/fastapi-profiler.errors';
 
 export const uploadDataset = async (req: Request, res: Response): Promise<void> => {
@@ -15,6 +15,7 @@ export const uploadDataset = async (req: Request, res: Response): Promise<void> 
   }
 
   const filePath = req.file.path;
+  const originalFilename = req.file.originalname;
 
   try {
     // Basic sanity check for CSV structural content
@@ -25,10 +26,9 @@ export const uploadDataset = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Call service to get profiler report
     const report = await datasetProfileService.profileDataset(filePath, {
       originalFilename: req.file.originalname,
-      storedFilename: req.file.filename,
+      storedFilename: req.file.filename || originalFilename,
     });
 
     res.status(200).json(report);
@@ -51,5 +51,44 @@ export const uploadDataset = async (req: Request, res: Response): Promise<void> 
         console.error('Failed to clean up file:', filePath, e);
       }
     }
+  }
+};
+
+export const listDatasets = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const datasets = await datasetProfileService.list();
+    res.status(200).json(datasets);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error listing datasets' });
+  }
+};
+
+export const getDataset = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const dataset = await datasetProfileService.findById(id);
+    if (!dataset) {
+      res.status(404).json({ error: 'Dataset not found' });
+      return;
+    }
+    res.status(200).json(dataset);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error retrieving dataset' });
+  }
+};
+
+export const getDatasetById = getDataset;
+
+export const deleteDataset = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const success = await datasetProfileService.deleteDataset(id);
+    if (!success) {
+      res.status(404).json({ error: 'Dataset not found' });
+      return;
+    }
+    res.status(200).json({ message: 'Dataset deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error deleting dataset' });
   }
 };

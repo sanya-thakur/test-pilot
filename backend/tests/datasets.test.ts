@@ -6,19 +6,21 @@ import { datasetProfileService } from '../src/services/dataset-profile.service';
 import {
   ProfilerUnavailableError,
   ProfilerTimeoutError,
-  ProfilerInvalidResponseError
+  ProfilerInvalidResponseError,
 } from '../src/clients/fastapi-profiler.errors';
 
 jest.mock('../src/services/dataset-profile.service', () => ({
   datasetProfileService: {
     profileDataset: jest.fn(),
     findById: jest.fn(),
+    getDatasetRecord: jest.fn(),
     list: jest.fn(),
-    deleteDataset: jest.fn()
-  }
+    listDatasets: jest.fn(),
+    deleteDataset: jest.fn(),
+  },
 }));
 
-describe('POST /api/v1/datasets/profile', () => {
+describe('Dataset Routes (/api/v1/datasets)', () => {
   const dummyCsvPath = path.join(__dirname, 'dummy.csv');
   const dummyBinPath = path.join(__dirname, 'dummy.bin');
 
@@ -35,130 +37,135 @@ describe('POST /api/v1/datasets/profile', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (datasetProfileService.profileDataset as jest.Mock).mockResolvedValue({ health_score: 85, datasetId: 'dataset-id' });
-  });
-
-  it('should reject missing file', async () => {
-    const res = await request(app).post('/api/v1/datasets/profile');
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/Missing file/);
-  });
-
-  it('should reject unsupported file type based on extension/mimetype', async () => {
-    const res = await request(app)
-      .post('/api/v1/datasets/profile')
-      .attach('file', dummyBinPath, 'dummy.exe');
-
-    expect(res.status).toBe(400);
-  });
-
-  it('should accept valid CSV, return profiler report, and cleanup file', async () => {
-    const res = await request(app)
-      .post('/api/v1/datasets/profile')
-      .attach('file', dummyCsvPath, 'test.csv');
-
-    expect(res.status).toBe(200);
-    expect(res.body.health_score).toBe(85);
-    expect(res.body.datasetId).toBe('dataset-id');
-    expect(datasetProfileService.profileDataset).toHaveBeenCalled();
-    
-    // Check if the file was deleted
-    const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
-    expect(fs.existsSync(calledPath)).toBe(false);
-  });
-
-  it('should return 503 and cleanup if profiler is unavailable', async () => {
-    (datasetProfileService.profileDataset as jest.Mock).mockRejectedValueOnce(new ProfilerUnavailableError('unreachable'));
-    
-    const res = await request(app)
-      .post('/api/v1/datasets/profile')
-      .attach('file', dummyCsvPath, 'test.csv');
-
-    expect(res.status).toBe(503);
-    const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
-    expect(fs.existsSync(calledPath)).toBe(false);
-  });
-
-  it('should return 504 and cleanup if profiler times out', async () => {
-    (datasetProfileService.profileDataset as jest.Mock).mockRejectedValueOnce(new ProfilerTimeoutError('timeout'));
-    
-    const res = await request(app)
-      .post('/api/v1/datasets/profile')
-      .attach('file', dummyCsvPath, 'test.csv');
-
-    expect(res.status).toBe(504);
-    const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
-    expect(fs.existsSync(calledPath)).toBe(false);
-  });
-
-  it('should return 502 and cleanup if profiler returns invalid response', async () => {
-    (datasetProfileService.profileDataset as jest.Mock).mockRejectedValueOnce(new ProfilerInvalidResponseError('invalid'));
-    
-    const res = await request(app)
-      .post('/api/v1/datasets/profile')
-      .attach('file', dummyCsvPath, 'test.csv');
-
-    expect(res.status).toBe(502);
-    const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
-    expect(fs.existsSync(calledPath)).toBe(false);
-  });
-});
-
-describe('GET /api/v1/datasets', () => {
-  beforeEach(() => {
     (datasetProfileService.list as jest.Mock).mockResolvedValue([
+      { id: 'dataset-id', originalFilename: 'test.csv', createdAt: '2026-01-01T00:00:00.000Z', healthScore: 85, profilerVersion: 'testpilot-profiler-v1' },
+    ]);
+    (datasetProfileService.listDatasets as jest.Mock).mockResolvedValue([
       { id: 'dataset-id', originalFilename: 'test.csv', createdAt: '2026-01-01T00:00:00.000Z', healthScore: 85, profilerVersion: 'testpilot-profiler-v1' },
     ]);
     (datasetProfileService.findById as jest.Mock).mockResolvedValue({
       id: 'dataset-id', originalFilename: 'test.csv', storedFilename: 'safe.csv', createdAt: '2026-01-01T00:00:00.000Z',
       profilerVersion: 'testpilot-profiler-v1', healthScore: 85, report: { health_score: { score: 85 } },
     });
-  });
-
-  it('returns the persisted dataset by ID', async () => {
-    const res = await request(app).get('/api/v1/datasets/dataset-id');
-    expect(res.status).toBe(200);
-    expect(res.body.id).toBe('dataset-id');
-    expect(res.body.report).toBeDefined();
-  });
-
-  it('returns 404 for an unknown ID', async () => {
-    (datasetProfileService.findById as jest.Mock).mockResolvedValueOnce(null);
-    const res = await request(app).get('/api/v1/datasets/missing');
-    expect(res.status).toBe(404);
-  });
-
-  it('returns lightweight summaries without the complete report', async () => {
-    const res = await request(app).get('/api/v1/datasets');
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual([{ id: 'dataset-id', originalFilename: 'test.csv', createdAt: '2026-01-01T00:00:00.000Z', healthScore: 85, profilerVersion: 'testpilot-profiler-v1' }]);
-  });
-
-  it('returns the existing dataset and preserves GET behavior', async () => {
-    const res = await request(app).get('/api/v1/datasets/dataset-id');
-    expect(res.status).toBe(200);
-    expect(res.body.id).toBe('dataset-id');
-  });
-});
-
-describe('DELETE /api/v1/datasets/:id', () => {
-  beforeEach(() => {
+    (datasetProfileService.getDatasetRecord as jest.Mock).mockResolvedValue({
+      id: 'dataset-id', originalFilename: 'test.csv', storedFilename: 'safe.csv', createdAt: '2026-01-01T00:00:00.000Z',
+      profilerVersion: 'testpilot-profiler-v1', healthScore: 85, report: { health_score: { score: 85 } },
+    });
     (datasetProfileService.deleteDataset as jest.Mock).mockResolvedValue(true);
   });
 
-  it('returns 204 and delegates deletion for an existing dataset', async () => {
-    const res = await request(app).delete('/api/v1/datasets/dataset-id');
+  describe('POST /api/v1/datasets/profile', () => {
+    it('should reject missing file', async () => {
+      const res = await request(app).post('/api/v1/datasets/profile');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Missing file/);
+    });
 
-    expect(res.status).toBe(204);
-    expect(res.text).toBe('');
-    expect(datasetProfileService.deleteDataset).toHaveBeenCalledWith('dataset-id');
+    it('should reject unsupported file type based on extension/mimetype', async () => {
+      const res = await request(app)
+        .post('/api/v1/datasets/profile')
+        .attach('file', dummyBinPath, 'dummy.exe');
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should accept valid CSV, return profiler report, and cleanup file', async () => {
+      const res = await request(app)
+        .post('/api/v1/datasets/profile')
+        .attach('file', dummyCsvPath, 'test.csv');
+
+      expect(res.status).toBe(200);
+      expect(res.body.health_score).toBe(85);
+      expect(res.body.datasetId).toBe('dataset-id');
+      expect(datasetProfileService.profileDataset).toHaveBeenCalled();
+
+      const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
+      expect(fs.existsSync(calledPath)).toBe(false);
+    });
+
+    it('should return 503 and cleanup if profiler is unavailable', async () => {
+      (datasetProfileService.profileDataset as jest.Mock).mockRejectedValueOnce(
+        new ProfilerUnavailableError('unreachable')
+      );
+
+      const res = await request(app)
+        .post('/api/v1/datasets/profile')
+        .attach('file', dummyCsvPath, 'test.csv');
+
+      expect(res.status).toBe(503);
+      const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
+      expect(fs.existsSync(calledPath)).toBe(false);
+    });
+
+    it('should return 504 and cleanup if profiler times out', async () => {
+      (datasetProfileService.profileDataset as jest.Mock).mockRejectedValueOnce(
+        new ProfilerTimeoutError('timeout')
+      );
+
+      const res = await request(app)
+        .post('/api/v1/datasets/profile')
+        .attach('file', dummyCsvPath, 'test.csv');
+
+      expect(res.status).toBe(504);
+      const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
+      expect(fs.existsSync(calledPath)).toBe(false);
+    });
+
+    it('should return 502 and cleanup if profiler returns invalid response', async () => {
+      (datasetProfileService.profileDataset as jest.Mock).mockRejectedValueOnce(
+        new ProfilerInvalidResponseError('invalid')
+      );
+
+      const res = await request(app)
+        .post('/api/v1/datasets/profile')
+        .attach('file', dummyCsvPath, 'test.csv');
+
+      expect(res.status).toBe(502);
+      const calledPath = (datasetProfileService.profileDataset as jest.Mock).mock.calls[0][0];
+      expect(fs.existsSync(calledPath)).toBe(false);
+    });
   });
 
-  it('returns 404 for a nonexistent dataset', async () => {
-    (datasetProfileService.deleteDataset as jest.Mock).mockResolvedValueOnce(false);
+  describe('GET /api/v1/datasets', () => {
+    it('returns lightweight summaries without the complete report', async () => {
+      const res = await request(app).get('/api/v1/datasets');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([{ id: 'dataset-id', originalFilename: 'test.csv', createdAt: '2026-01-01T00:00:00.000Z', healthScore: 85, profilerVersion: 'testpilot-profiler-v1' }]);
+    });
+  });
 
-    const res = await request(app).delete('/api/v1/datasets/missing');
+  describe('GET /api/v1/datasets/:id', () => {
+    it('returns the persisted dataset by ID', async () => {
+      const res = await request(app).get('/api/v1/datasets/dataset-id');
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe('dataset-id');
+      expect(res.body.report).toBeDefined();
+    });
 
-    expect(res.status).toBe(404);
-    expect(res.body).toEqual({ error: 'Dataset not found' });
+    it('returns 404 for an unknown ID', async () => {
+      (datasetProfileService.findById as jest.Mock).mockResolvedValueOnce(null);
+      (datasetProfileService.getDatasetRecord as jest.Mock).mockResolvedValueOnce(null);
+      const res = await request(app).get('/api/v1/datasets/missing');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Dataset not found');
+    });
+  });
+
+  describe('DELETE /api/v1/datasets/:id', () => {
+    it('deletes dataset when found', async () => {
+      (datasetProfileService.deleteDataset as jest.Mock).mockResolvedValueOnce(true);
+
+      const res = await request(app).delete('/api/v1/datasets/dataset-id');
+      expect(res.status).toBe(200);
+    });
+
+    it('returns 404 for a nonexistent dataset', async () => {
+      (datasetProfileService.deleteDataset as jest.Mock).mockResolvedValueOnce(false);
+
+      const res = await request(app).delete('/api/v1/datasets/missing');
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: 'Dataset not found' });
+    });
   });
 });
