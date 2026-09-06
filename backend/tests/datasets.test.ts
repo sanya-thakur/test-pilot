@@ -151,6 +151,37 @@ describe('Dataset Routes (/api/v1/datasets)', () => {
     });
   });
 
+  describe('GET /api/v1/datasets/:id/ai-context', () => {
+    it('returns 200 and AI report context for a valid dataset ID', async () => {
+      const res = await request(app).get('/api/v1/datasets/dataset-id/ai-context');
+      expect(res.status).toBe(200);
+      expect(res.body.datasetId).toBe('dataset-id');
+      expect(res.body.id).toBe('dataset-id');
+      expect(res.body.originalFilename).toBe('test.csv');
+      expect(res.body.healthScore).toBe(85);
+      expect(res.body.profilerVersion).toBe('testpilot-profiler-v1');
+      expect(res.body.severityTotals).toBeDefined();
+      expect(res.body.findings).toBeDefined();
+      expect(res.body.columnProfiles).toBeDefined();
+    });
+
+    it('does not expose internal or sensitive fields like storedFilename', async () => {
+      const res = await request(app).get('/api/v1/datasets/dataset-id/ai-context');
+      expect(res.status).toBe(200);
+      expect(res.body.storedFilename).toBeUndefined();
+      expect(res.body.stored_filename).toBeUndefined();
+      expect(res.body.filePath).toBeUndefined();
+      expect(res.body.report).toBeUndefined();
+    });
+
+    it('returns 404 for an unknown dataset ID', async () => {
+      (datasetProfileService.findById as jest.Mock).mockResolvedValueOnce(null);
+      const res = await request(app).get('/api/v1/datasets/nonexistent/ai-context');
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: 'Dataset not found' });
+    });
+  });
+
   describe('DELETE /api/v1/datasets/:id', () => {
     it('deletes dataset when found', async () => {
       (datasetProfileService.deleteDataset as jest.Mock).mockResolvedValueOnce(true);
