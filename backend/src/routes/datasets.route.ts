@@ -5,6 +5,7 @@ import {
   getDataset,
   deleteDataset,
   getDatasetAiContext,
+  askAiAssistant,
 } from '../controllers/datasets.controller';
 import { uploadMiddleware } from '../storage/upload.storage';
 
@@ -40,6 +41,8 @@ router.post(
 router.get('/', listDatasets);
 router.delete('/:id', deleteDataset);
 router.get('/:id/ai-context', getDatasetAiContext);
+router.post('/:id/ai-assistant', askAiAssistant);
 router.get('/:id', getDataset);
 
 export default router;
+

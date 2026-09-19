@@ -2,6 +2,14 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import { datasetProfileService } from '../services/dataset-profile.service';
 import { aiReportContextService } from '../services/ai-report-context.service';
+import { aiAssistantService } from '../services/ai-assistant.service';
+import { AIAssistantRequestSchema } from '../contracts/ai-assistant.contract';
+import {
+  AIProviderError,
+  AIProviderConfigError,
+  AIProviderTimeoutError,
+  AIProviderAPIError,
+} from '../contracts/ai-provider.contract';
 import {
   ProfilerUnavailableError,
   ProfilerTimeoutError,
@@ -107,3 +115,37 @@ export const deleteDataset = async (req: Request, res: Response): Promise<void> 
     res.status(500).json({ error: 'Internal server error deleting dataset' });
   }
 };
+
+export const askAiAssistant = async (req: Request, res: Response): Promise<void> => {
+  const parseResult = AIAssistantRequestSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    const errorMessage = parseResult.error.errors.map((e) => e.message).join(', ');
+    res.status(400).json({ error: errorMessage });
+    return;
+  }
+
+  const { message } = parseResult.data;
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+  try {
+    const result = await aiAssistantService.askDatasetQuestion(id, message);
+    if (!result) {
+      res.status(404).json({ error: 'Dataset not found' });
+      return;
+    }
+    res.status(200).json(result);
+  } catch (err: any) {
+    if (err instanceof AIProviderTimeoutError) {
+      res.status(504).json({ error: 'AI provider request timed out' });
+    } else if (err instanceof AIProviderConfigError) {
+      res.status(503).json({ error: 'AI provider configuration error' });
+    } else if (err instanceof AIProviderAPIError) {
+      res.status(502).json({ error: 'AI provider returned an API error' });
+    } else if (err instanceof AIProviderError) {
+      res.status(502).json({ error: 'AI provider error' });
+    } else {
+      res.status(500).json({ error: 'Internal server error processing AI assistant request' });
+    }
+  }
+};
+
