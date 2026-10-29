@@ -29,12 +29,16 @@ describe('ProjectIngestionService', () => {
 
   it('safely extracts and inventories supported source files without executing them', async () => {
     const archive = path.join(temporaryDirectory, 'example.zip');
-    await writeZip(archive, {
-      'package.json': '{"name":"example"}',
-      'src/routes/users.route.ts': 'export const route = true;',
-      'prisma/schema.prisma': 'model User { id String @id }',
-      'src/app.test.ts': 'test("x", () => {})',
-      'vite.config.ts': 'export default {}',
+    await new Promise<void>((resolve, reject) => {
+      const zip = new yazl.ZipFile();
+      zip.addEmptyDirectory('src/');
+      zip.addBuffer(Buffer.from('{"name":"example"}'), 'package.json');
+      zip.addBuffer(Buffer.from('export const route = true;'), 'src/routes/users.route.ts');
+      zip.addBuffer(Buffer.from('model User { id String @id }'), 'prisma/schema.prisma');
+      zip.addBuffer(Buffer.from('test("x", () => {})'), 'src/app.test.ts');
+      zip.addBuffer(Buffer.from('export default {}'), 'vite.config.ts');
+      zip.outputStream.pipe(require('fs').createWriteStream(archive)).on('close', resolve).on('error', reject);
+      zip.end();
     });
     const repository = new MemoryProjects();
     const service = new ProjectIngestionService(repository, path.join(temporaryDirectory, 'extracted'));

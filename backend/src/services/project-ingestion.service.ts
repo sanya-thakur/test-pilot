@@ -14,7 +14,13 @@ export class ProjectIngestionError extends Error {
   constructor(public readonly code: 'INVALID_ARCHIVE' | 'RESOURCE_LIMIT' | 'UNSUPPORTED_FILE', message: string) { super(message); }
 }
 
-const isUnsafePath = (entryPath: string): boolean => path.posix.isAbsolute(entryPath) || entryPath.includes('\\') || entryPath.split('/').some((part) => part === '..' || part === '');
+const isUnsafePath = (entryPath: string): boolean => {
+  if (!entryPath || path.posix.isAbsolute(entryPath) || entryPath.includes('\\')) return true;
+  const parts = entryPath.split('/');
+  // ZIP directory entries conventionally end in `/`; only that final empty
+  // component is valid. Empty intermediate components and traversal are not.
+  return parts.some((part, index) => part === '..' || part === '.' || (part === '' && index !== parts.length - 1));
+};
 const uniqueSorted = (values: string[]) => [...new Set(values)].sort();
 
 export class ProjectIngestionService {
