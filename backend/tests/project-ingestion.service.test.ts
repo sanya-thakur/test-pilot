@@ -38,6 +38,9 @@ describe('ProjectIngestionService', () => {
       zip.addBuffer(Buffer.from('test("x", () => {})'), 'src/app.test.ts');
       zip.addBuffer(Buffer.from('export default {}'), 'vite.config.ts');
       zip.addBuffer(Buffer.from('FROM node:22'), 'Dockerfile');
+      zip.addBuffer(Buffer.from('should not be extracted'), 'node_modules/example/index.js');
+      zip.addBuffer(Buffer.from('secret=do-not-store'), '.env');
+      zip.addBuffer(Buffer.from('binary-like'), 'public/logo.png');
       zip.outputStream.pipe(require('fs').createWriteStream(archive)).on('close', resolve).on('error', reject);
       zip.end();
     });
@@ -53,5 +56,8 @@ describe('ProjectIngestionService', () => {
     expect(project.schemas).toEqual(['prisma/schema.prisma']);
     expect(project.tests).toEqual(['src/app.test.ts']);
     expect(project.files.map((file) => file.path)).toEqual([...project.files.map((file) => file.path)].sort());
+    expect(project.files.map((file) => file.path)).not.toContain('node_modules/example/index.js');
+    expect(project.files.map((file) => file.path)).not.toContain('.env');
+    expect(project.files.map((file) => file.path)).not.toContain('public/logo.png');
   });
 });

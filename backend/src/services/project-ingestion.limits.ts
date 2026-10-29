@@ -9,6 +9,7 @@ const positiveInteger = (value: string | undefined, fallback: number): number =>
 // tightened by deployment configuration without permitting unbounded uploads.
 export const projectIngestionLimits = {
   maxArchiveBytes: positiveInteger(process.env.PROJECT_MAX_ARCHIVE_BYTES, mb(250)),
+  maxArchiveEntries: positiveInteger(process.env.PROJECT_MAX_ARCHIVE_ENTRIES, 50_000),
   maxEntries: positiveInteger(process.env.PROJECT_MAX_ENTRIES, 10_000),
   maxEntryBytes: positiveInteger(process.env.PROJECT_MAX_ENTRY_BYTES, mb(20)),
   maxTotalBytes: positiveInteger(process.env.PROJECT_MAX_TOTAL_BYTES, mb(500)),

@@ -8,6 +8,7 @@ import { projectIngestionLimits } from './project-ingestion.limits';
 const SUPPORTED_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.go', '.rb', '.php', '.cs', '.json', '.yaml', '.yml', '.sql', '.prisma', '.html', '.css', '.md', '.txt']);
 const SUPPORTED_EXTENSIONLESS_FILES = new Set(['dockerfile', 'makefile', 'procfile', 'license', 'license.txt', 'copying', 'readme', 'readme.txt', '.gitignore', '.dockerignore', '.npmignore', '.editorconfig', '.env.example', '.env.sample', '.env.template']);
 const LANGUAGE_BY_EXTENSION: Record<string, string> = { '.js': 'JavaScript', '.jsx': 'JavaScript', '.ts': 'TypeScript', '.tsx': 'TypeScript', '.py': 'Python', '.java': 'Java', '.go': 'Go', '.rb': 'Ruby', '.php': 'PHP', '.cs': 'C#', '.sql': 'SQL', '.prisma': 'Prisma' };
+const EXCLUDED_DIRECTORY_NAMES = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.next', '.cache']);
 
 export class ProjectIngestionError extends Error {
   constructor(public readonly code: 'INVALID_ARCHIVE' | 'RESOURCE_LIMIT' | 'UNSUPPORTED_FILE', message: string) { super(message); }
@@ -21,6 +22,11 @@ const isUnsafePath = (entryPath: string): boolean => {
   return parts.some((part, index) => part === '..' || part === '.' || (part === '' && index !== parts.length - 1));
 };
 const uniqueSorted = (values: string[]) => [...new Set(values)].sort();
+const shouldSkipEntry = (entryPath: string): boolean => {
+  const parts = entryPath.split('/').filter(Boolean);
+  const basename = parts.at(-1)?.toLowerCase() || '';
+  return parts.some((part) => EXCLUDED_DIRECTORY_NAMES.has(part.toLowerCase())) || basename === '.env' || basename.startsWith('.env.');
+};
 
 export class ProjectIngestionService {
   constructor(
@@ -37,19 +43,23 @@ export class ProjectIngestionService {
       await new Promise<void>((resolve, reject) => {
         yauzl.open(zipPath, { lazyEntries: true, validateEntrySizes: true }, (openError, zip) => {
           if (openError || !zip) return reject(new ProjectIngestionError('INVALID_ARCHIVE', 'The uploaded file is not a readable ZIP archive.'));
-          let entries = 0;
+          let archiveEntries = 0;
+          let sourceEntries = 0;
           const fail = (error: Error) => { zip.close(); reject(error); };
           zip.readEntry();
           zip.on('entry', (entry) => {
-            entries += 1;
-            if (entries > projectIngestionLimits.maxEntries) return fail(new ProjectIngestionError('RESOURCE_LIMIT', `Archive exceeds the ${projectIngestionLimits.maxEntries} file limit.`));
+            archiveEntries += 1;
+            if (archiveEntries > projectIngestionLimits.maxArchiveEntries) return fail(new ProjectIngestionError('RESOURCE_LIMIT', `Archive exceeds the ${projectIngestionLimits.maxArchiveEntries} archive entry limit.`));
             if (isUnsafePath(entry.fileName)) return fail(new ProjectIngestionError('INVALID_ARCHIVE', 'Archive contains an unsafe file path.'));
             if (/\/$/.test(entry.fileName)) return zip.readEntry();
+            if (shouldSkipEntry(entry.fileName)) return zip.readEntry();
+            sourceEntries += 1;
+            if (sourceEntries > projectIngestionLimits.maxEntries) return fail(new ProjectIngestionError('RESOURCE_LIMIT', `Archive exceeds the ${projectIngestionLimits.maxEntries} supported source file limit.`));
             if (entry.uncompressedSize > projectIngestionLimits.maxEntryBytes || totalBytes + entry.uncompressedSize > projectIngestionLimits.maxTotalBytes) return fail(new ProjectIngestionError('RESOURCE_LIMIT', 'Archive exceeds the allowed uncompressed size.'));
             const ext = path.extname(entry.fileName).toLowerCase();
             const basename = path.posix.basename(entry.fileName).toLowerCase();
             const isSupported = SUPPORTED_EXTENSIONS.has(ext) || SUPPORTED_EXTENSIONLESS_FILES.has(basename) || basename.startsWith('.env.');
-            if (!isSupported) return fail(new ProjectIngestionError('UNSUPPORTED_FILE', `Unsupported file type: ${ext || 'no extension'}.`));
+            if (!isSupported) return zip.readEntry();
             totalBytes += entry.uncompressedSize;
             const destination = path.resolve(root, entry.fileName);
             if (!destination.startsWith(`${root}${path.sep}`)) return fail(new ProjectIngestionError('INVALID_ARCHIVE', 'Archive contains an unsafe file path.'));
