@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { UploadPanel } from './components/UploadPanel';
 import { HealthReport } from './components/HealthReport';
 import { DatasetHistory } from './components/DatasetHistory';
+import { ProjectIngestionPanel } from './components/ProjectIngestionPanel';
 import { deleteDataset, getDatasetById, getDatasetHistory, uploadDataset } from './services/api';
 import type { DatasetSummary, ProfilerResponse } from './types/profiler';
 
@@ -125,6 +126,7 @@ function App() {
       </header>
 
       <main className="page-layout">
+        <ProjectIngestionPanel />
         <div className="workspace-grid">
           <DatasetHistory
             datasets={history}
