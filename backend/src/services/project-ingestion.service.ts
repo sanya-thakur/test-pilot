@@ -6,6 +6,7 @@ import type { ProjectFileSummary, ProjectRecord, ProjectRepository } from '../re
 import { projectIngestionLimits } from './project-ingestion.limits';
 
 const SUPPORTED_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.go', '.rb', '.php', '.cs', '.json', '.yaml', '.yml', '.sql', '.prisma', '.html', '.css', '.md', '.txt']);
+const SUPPORTED_EXTENSIONLESS_FILES = new Set(['dockerfile', 'makefile', 'procfile', 'license', 'license.txt', 'copying', 'readme', 'readme.txt', '.gitignore', '.dockerignore', '.npmignore', '.editorconfig', '.env.example', '.env.sample', '.env.template']);
 const LANGUAGE_BY_EXTENSION: Record<string, string> = { '.js': 'JavaScript', '.jsx': 'JavaScript', '.ts': 'TypeScript', '.tsx': 'TypeScript', '.py': 'Python', '.java': 'Java', '.go': 'Go', '.rb': 'Ruby', '.php': 'PHP', '.cs': 'C#', '.sql': 'SQL', '.prisma': 'Prisma' };
 
 export class ProjectIngestionError extends Error {
@@ -46,7 +47,9 @@ export class ProjectIngestionService {
             if (/\/$/.test(entry.fileName)) return zip.readEntry();
             if (entry.uncompressedSize > projectIngestionLimits.maxEntryBytes || totalBytes + entry.uncompressedSize > projectIngestionLimits.maxTotalBytes) return fail(new ProjectIngestionError('RESOURCE_LIMIT', 'Archive exceeds the allowed uncompressed size.'));
             const ext = path.extname(entry.fileName).toLowerCase();
-            if (!SUPPORTED_EXTENSIONS.has(ext)) return fail(new ProjectIngestionError('UNSUPPORTED_FILE', `Unsupported file type: ${ext || 'no extension'}.`));
+            const basename = path.posix.basename(entry.fileName).toLowerCase();
+            const isSupported = SUPPORTED_EXTENSIONS.has(ext) || SUPPORTED_EXTENSIONLESS_FILES.has(basename) || basename.startsWith('.env.');
+            if (!isSupported) return fail(new ProjectIngestionError('UNSUPPORTED_FILE', `Unsupported file type: ${ext || 'no extension'}.`));
             totalBytes += entry.uncompressedSize;
             const destination = path.resolve(root, entry.fileName);
             if (!destination.startsWith(`${root}${path.sep}`)) return fail(new ProjectIngestionError('INVALID_ARCHIVE', 'Archive contains an unsafe file path.'));

@@ -37,6 +37,7 @@ describe('ProjectIngestionService', () => {
       zip.addBuffer(Buffer.from('model User { id String @id }'), 'prisma/schema.prisma');
       zip.addBuffer(Buffer.from('test("x", () => {})'), 'src/app.test.ts');
       zip.addBuffer(Buffer.from('export default {}'), 'vite.config.ts');
+      zip.addBuffer(Buffer.from('FROM node:22'), 'Dockerfile');
       zip.outputStream.pipe(require('fs').createWriteStream(archive)).on('close', resolve).on('error', reject);
       zip.end();
     });
@@ -44,7 +45,7 @@ describe('ProjectIngestionService', () => {
     const service = new ProjectIngestionService(repository, path.join(temporaryDirectory, 'extracted'));
     const project = await service.ingest(archive, 'example.zip');
 
-    expect(project.fileCount).toBe(5);
+    expect(project.fileCount).toBe(6);
     expect(project.languages).toEqual(['Prisma', 'TypeScript']);
     expect(project.frameworks).toContain('Vite');
     expect(project.manifests).toEqual(['package.json']);
