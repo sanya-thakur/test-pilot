@@ -3,6 +3,7 @@ import fs from 'fs';
 import multer from 'multer';
 import path from 'path';
 import type { Request } from 'express';
+import { projectIngestionLimits } from '../services/project-ingestion.limits';
 
 const UPLOAD_DIR = path.resolve(__dirname, '../../..', 'data/project-uploads');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -17,5 +18,5 @@ export const projectUploadMiddleware = multer({
     if (!isZip) return callback(new Error('INVALID_PROJECT_ARCHIVE'));
     callback(null, true);
   },
-  limits: { fileSize: 50 * 1024 * 1024, files: 1 },
+  limits: { fileSize: projectIngestionLimits.maxArchiveBytes, files: 1 },
 });

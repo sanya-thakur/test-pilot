@@ -3,10 +3,8 @@ import path from 'path';
 import yauzl from 'yauzl';
 import { LocalProjectRepository } from '../repositories/local-project.repository';
 import type { ProjectFileSummary, ProjectRecord, ProjectRepository } from '../repositories/project.repository';
+import { projectIngestionLimits } from './project-ingestion.limits';
 
-const MAX_ENTRIES = 2_000;
-const MAX_ENTRY_BYTES = 5 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 100 * 1024 * 1024;
 const SUPPORTED_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.go', '.rb', '.php', '.cs', '.json', '.yaml', '.yml', '.sql', '.prisma', '.html', '.css', '.md', '.txt']);
 const LANGUAGE_BY_EXTENSION: Record<string, string> = { '.js': 'JavaScript', '.jsx': 'JavaScript', '.ts': 'TypeScript', '.tsx': 'TypeScript', '.py': 'Python', '.java': 'Java', '.go': 'Go', '.rb': 'Ruby', '.php': 'PHP', '.cs': 'C#', '.sql': 'SQL', '.prisma': 'Prisma' };
 
@@ -43,10 +41,10 @@ export class ProjectIngestionService {
           zip.readEntry();
           zip.on('entry', (entry) => {
             entries += 1;
-            if (entries > MAX_ENTRIES) return fail(new ProjectIngestionError('RESOURCE_LIMIT', `Archive exceeds the ${MAX_ENTRIES} file limit.`));
+            if (entries > projectIngestionLimits.maxEntries) return fail(new ProjectIngestionError('RESOURCE_LIMIT', `Archive exceeds the ${projectIngestionLimits.maxEntries} file limit.`));
             if (isUnsafePath(entry.fileName)) return fail(new ProjectIngestionError('INVALID_ARCHIVE', 'Archive contains an unsafe file path.'));
             if (/\/$/.test(entry.fileName)) return zip.readEntry();
-            if (entry.uncompressedSize > MAX_ENTRY_BYTES || totalBytes + entry.uncompressedSize > MAX_TOTAL_BYTES) return fail(new ProjectIngestionError('RESOURCE_LIMIT', 'Archive exceeds the allowed uncompressed size.'));
+            if (entry.uncompressedSize > projectIngestionLimits.maxEntryBytes || totalBytes + entry.uncompressedSize > projectIngestionLimits.maxTotalBytes) return fail(new ProjectIngestionError('RESOURCE_LIMIT', 'Archive exceeds the allowed uncompressed size.'));
             const ext = path.extname(entry.fileName).toLowerCase();
             if (!SUPPORTED_EXTENSIONS.has(ext)) return fail(new ProjectIngestionError('UNSUPPORTED_FILE', `Unsupported file type: ${ext || 'no extension'}.`));
             totalBytes += entry.uncompressedSize;
