@@ -12,6 +12,24 @@ export function ProjectIngestionPanel() {
     {file && <div className="file-pill">{file.name}</div>}
     {error && <div className="error-box" role="alert">{error}</div>}
     <button className="primary-button" type="button" disabled={!file || busy || !file.name.toLowerCase().endsWith('.zip')} onClick={() => void submit()}>{busy ? 'Inspecting…' : 'Ingest project ZIP'}</button>
-    {latest && <div className="detail-metrics"><strong>{latest.originalFilename}</strong><span>{latest.fileCount} files · {latest.languages.join(', ') || 'No source language detected'}</span><span>Frameworks: {latest.frameworks.join(', ') || 'None detected'}</span><span>Routes: {latest.routes.length} · Schemas: {latest.schemas.length} · Tests: {latest.tests.length}</span></div>}
+    {latest && <div className="project-overview" aria-label="Project overview">
+      <div className="project-overview-heading"><strong>{latest.originalFilename}</strong><span>{latest.fileCount} supported files inventoried</span></div>
+      <div className="overview-grid">
+        <div className="overview-stat"><span>Languages</span><strong>{latest.languages.join(', ') || 'None detected'}</strong></div>
+        <div className="overview-stat"><span>Frameworks</span><strong>{latest.frameworks.join(', ') || 'None detected'}</strong></div>
+        <div className="overview-stat"><span>Source size</span><strong>{(latest.totalUncompressedBytes / 1024 / 1024).toFixed(1)} MB</strong></div>
+      </div>
+      <div className="project-inventory-grid">
+        <Inventory label="Dependency manifests" entries={latest.manifests} />
+        <Inventory label="Routes" entries={latest.routes} />
+        <Inventory label="Schemas" entries={latest.schemas} />
+        <Inventory label="Tests" entries={latest.tests} />
+      </div>
+      <Inventory label="Files (first 20)" entries={latest.files.slice(0, 20).map((file) => file.path)} />
+    </div>}
   </section>;
+}
+
+function Inventory({ label, entries }: { label: string; entries: string[] }) {
+  return <section className="project-inventory"><h3>{label} <span>({entries.length})</span></h3>{entries.length ? <ul>{entries.map((entry) => <li key={entry}>{entry}</li>)}</ul> : <p className="muted-copy">None detected</p>}</section>;
 }
