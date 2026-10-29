@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { UploadPanel } from './components/UploadPanel';
 import { HealthReport } from './components/HealthReport';
 import { DatasetHistory } from './components/DatasetHistory';
@@ -18,6 +18,7 @@ function App() {
   const [reportMode, setReportMode] = useState<'current' | 'historical' | null>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const reportRequest = useRef(0);
 
   const canSubmit = useMemo(() => Boolean(selectedFile), [selectedFile]);
 
@@ -64,6 +65,8 @@ function App() {
   };
 
   const handleReset = () => {
+    reportRequest.current += 1;
+    setIsReportLoading(false);
     setReport(null);
     setSelectedFile(null);
     setError(null);
@@ -74,6 +77,7 @@ function App() {
   };
 
   const handleHistorySelect = async (dataset: DatasetSummary) => {
+    const requestId = ++reportRequest.current;
     setSelectedDatasetId(dataset.id);
     setSelectedDatasetName(dataset.originalFilename);
     setReportMode('historical');
@@ -83,11 +87,13 @@ function App() {
 
     try {
       const savedDataset = await getDatasetById(dataset.id);
+      if (requestId !== reportRequest.current) return;
       setReport(savedDataset.report);
     } catch (historyLoadError) {
+      if (requestId !== reportRequest.current) return;
       setReportError(historyLoadError instanceof Error ? historyLoadError.message : 'The saved dataset could not be loaded.');
     } finally {
-      setIsReportLoading(false);
+      if (requestId === reportRequest.current) setIsReportLoading(false);
     }
   };
 
@@ -95,6 +101,8 @@ function App() {
     await deleteDataset(dataset.id);
     setHistory((current) => current.filter((item) => item.id !== dataset.id));
     if (selectedDatasetId === dataset.id) {
+      reportRequest.current += 1;
+      setIsReportLoading(false);
       setReport(null);
       setSelectedDatasetId(null);
       setSelectedDatasetName(null);

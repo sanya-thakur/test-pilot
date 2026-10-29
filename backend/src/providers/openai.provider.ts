@@ -88,13 +88,31 @@ export class OpenAIProvider implements AIProvider {
         throw err;
       }
       if (err?.name === 'APIConnectionTimeoutError' || err?.name === 'TimeoutError' || err?.code === 'ETIMEDOUT') {
+        const safeMessage = err?.message ? String(err.message).replace(/sk-[a-zA-Z0-9_-]+/g, '[REDACTED_API_KEY]') : 'Timeout error';
+        console.error('[OpenAIProvider] Timeout error:', {
+          name: err?.name,
+          code: err?.code,
+          message: safeMessage,
+        });
         throw new AIProviderTimeoutError(`OpenAI request timed out after ${this.timeoutMs}ms`);
       }
       if (err instanceof OpenAI.APIError) {
         const safeMessage = err.message ? err.message.replace(/sk-[a-zA-Z0-9_-]+/g, '[REDACTED_API_KEY]') : 'OpenAI API Error';
+        console.error('[OpenAIProvider] OpenAI API error:', {
+          status: err.status,
+          code: err.code,
+          type: err.type,
+          name: err.name,
+          message: safeMessage,
+        });
         throw new AIProviderAPIError(`OpenAI API error: ${safeMessage}`, err.status);
       }
       const rawMsg = err?.message ? String(err.message).replace(/sk-[a-zA-Z0-9_-]+/g, '[REDACTED_API_KEY]') : 'Unknown error';
+      console.error('[OpenAIProvider] Error generating response:', {
+        name: err?.name,
+        code: err?.code,
+        message: rawMsg,
+      });
       throw new AIProviderError(`Failed to generate AI response: ${rawMsg}`);
     }
   }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 import type { PersistedDataset } from './types/profiler';
@@ -7,6 +7,7 @@ const mockUploadDataset = vi.fn();
 const mockGetDatasetHistory = vi.fn();
 const mockGetDatasetById = vi.fn();
 const mockDeleteDataset = vi.fn();
+const mockAskAIAssistant = vi.fn();
 
 const savedDataset = {
   id: 'saved-dataset-1',
@@ -37,6 +38,7 @@ vi.mock('./services/api', () => ({
   getDatasetHistory: (...args: unknown[]) => mockGetDatasetHistory(...args),
   getDatasetById: (...args: unknown[]) => mockGetDatasetById(...args),
   deleteDataset: (...args: unknown[]) => mockDeleteDataset(...args),
+  askAIAssistant: (...args: unknown[]) => mockAskAIAssistant(...args),
 }));
 
 describe('TestPilot app', () => {
@@ -44,6 +46,52 @@ describe('TestPilot app', () => {
     vi.clearAllMocks();
     mockGetDatasetHistory.mockResolvedValue([]);
     mockDeleteDataset.mockResolvedValue(undefined);
+  });
+
+  it('connects the assistant to a saved dataset and clears it when the report closes', async () => {
+    mockGetDatasetHistory.mockResolvedValue([savedDataset]);
+    mockGetDatasetById.mockResolvedValue(savedReport);
+    mockAskAIAssistant.mockResolvedValue({ datasetId: savedDataset.id, message: 'Explain score', answer: 'Saved report answer' });
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: /Open saved dataset customers.csv/i }));
+    const question = await screen.findByRole('textbox', { name: 'Your question' });
+    fireEvent.change(question, { target: { value: 'Explain score' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Ask assistant' }));
+    expect(await screen.findByText('Saved report answer')).toBeInTheDocument();
+    expect(mockAskAIAssistant).toHaveBeenCalledWith(savedDataset.id, 'Explain score', expect.any(AbortSignal));
+    await userEvent.click(screen.getByRole('button', { name: /Back to history/i }));
+    expect(screen.queryByRole('heading', { name: 'Ask about this report' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Open saved dataset customers.csv/i }));
+    expect(await screen.findByRole('textbox', { name: 'Your question' })).toHaveValue('');
+    expect(screen.queryByText('Saved report answer')).not.toBeInTheDocument();
+  });
+
+  it('connects the assistant to the dataset ID returned by an upload', async () => {
+    mockUploadDataset.mockResolvedValue({ ...savedReport.report, datasetId: 'new-upload' });
+    mockAskAIAssistant.mockResolvedValue({ datasetId: 'new-upload', message: 'Explain score', answer: 'New upload answer' });
+    render(<App />);
+    await userEvent.upload(screen.getByLabelText(/Choose a CSV file/i), new File(['id\n1'], 'new.csv', { type: 'text/csv' }));
+    await userEvent.click(screen.getByRole('button', { name: /Analyze dataset/i }));
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Your question' }), { target: { value: 'Explain score' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Ask assistant' }));
+    expect(await screen.findByText('New upload answer')).toBeInTheDocument();
+    expect(mockAskAIAssistant).toHaveBeenCalledWith('new-upload', 'Explain score', expect.any(AbortSignal));
+  });
+
+  it('keeps the report and assistant on the latest selected dataset when report loads finish out of order', async () => {
+    const second = { ...savedDataset, id: 'second-dataset', originalFilename: 'second.csv' };
+    let resolveFirst: (value: PersistedDataset) => void = () => {};
+    mockGetDatasetHistory.mockResolvedValue([savedDataset, second]);
+    mockGetDatasetById.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValueOnce({ ...savedReport, ...second, report: { ...savedReport.report, health_score: { ...savedReport.report.health_score, score: 77 } } });
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: /Open saved dataset customers.csv/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Open saved dataset second.csv/i }));
+    expect(await screen.findByText('77')).toBeInTheDocument();
+    await act(async () => resolveFirst(savedReport));
+    expect(screen.getByText('77')).toBeInTheDocument();
+    expect(screen.getByText('Dataset ID second-dataset')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Your question' })).toHaveValue('');
   });
 
   it('renders the upload panel', async () => {

@@ -7,6 +7,148 @@ import type {
 } from '../contracts/ai-report-context';
 import { datasetProfileService, DatasetProfileService } from './dataset-profile.service';
 
+/** Maximum pretty-serialized report context sent to an AI provider. */
+export const MAX_AI_PROVIDER_CONTEXT_CHARACTERS = 24_000;
+const MAX_AI_PROVIDER_FINDINGS = 20;
+const MAX_AI_PROVIDER_COLUMNS = 20;
+const MAX_RECORD_ENTRIES = 8;
+const MAX_TEXT_CHARACTERS = 128;
+const MAX_KEY_CHARACTERS = 48;
+
+export type AIProviderContextDiagnostics = {
+  sourceFindingCount: number;
+  sourceColumnProfileCount: number;
+  sentFindingCount: number;
+  sentColumnProfileCount: number;
+  serializedCharacterCount: number;
+};
+
+const severityRank: Record<AIFinding['severity'], number> = { error: 0, warning: 1, info: 2 };
+
+function truncateText(value: string, maxLength = MAX_TEXT_CHARACTERS): string {
+  return value.length <= maxLength ? value : value.slice(0, maxLength);
+}
+
+function compactNumericRecord(value: Record<string, unknown> | null | undefined): Record<string, number> {
+  if (!value || typeof value !== 'object') return {};
+  return Object.entries(value)
+    .filter(([, entry]) => typeof entry === 'number' && Number.isFinite(entry))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .slice(0, MAX_RECORD_ENTRIES)
+    .reduce<Record<string, number>>((result, [key, entry]) => {
+      result[truncateText(key, MAX_KEY_CHARACTERS)] = entry as number;
+      return result;
+    }, {});
+}
+
+function compactDateRange(value: Record<string, string> | null | undefined): Record<string, string> | null {
+  if (!value || typeof value !== 'object') return null;
+  const compact = Object.entries(value)
+    .filter(([, entry]) => typeof entry === 'string')
+    .sort(([left], [right]) => left.localeCompare(right))
+    .slice(0, MAX_RECORD_ENTRIES)
+    .reduce<Record<string, string>>((result, [key, entry]) => {
+      result[truncateText(key, MAX_KEY_CHARACTERS)] = truncateText(entry);
+      return result;
+    }, {});
+  return Object.keys(compact).length > 0 ? compact : null;
+}
+
+function compactFinding(finding: AIFinding): AIFinding {
+  return {
+    ruleId: truncateText(finding.ruleId),
+    severity: finding.severity,
+    column: finding.column ? truncateText(finding.column) : null,
+    // Finding metrics are expected to be numeric. Drop arbitrary nested/string values.
+    metrics: compactNumericRecord(finding.metrics),
+  };
+}
+
+function compactColumnProfile(profile: AIColumnProfile): AIColumnProfile {
+  return {
+    columnName: truncateText(profile.columnName),
+    inferredType: truncateText(profile.inferredType),
+    nullCount: profile.nullCount,
+    nullPercentage: profile.nullPercentage,
+    emptyStringCount: profile.emptyStringCount,
+    distinctCount: profile.distinctCount,
+    distinctPercentage: profile.distinctPercentage,
+    duplicateValueRate: profile.duplicateValueRate,
+    invalidParsedValueCount: profile.invalidParsedValueCount,
+    numericStatistics: compactNumericRecord(profile.numericStatistics),
+    stringLengthStatistics: compactNumericRecord(profile.stringLengthStatistics),
+    dateRange: compactDateRange(profile.dateRange),
+    // Raw representative values can be sensitive and are unnecessary for aggregate profiling advice.
+    samples: [],
+  };
+}
+
+/**
+ * Builds the deterministic, bounded projection used only for provider requests.
+ * The public AI-context endpoint continues to return the complete mapped report.
+ */
+export function buildAIProviderContext(context: AIReportContext): {
+  context: AIReportContext;
+  diagnostics: AIProviderContextDiagnostics;
+} {
+  const sourceFindings = Array.isArray(context.findings) ? context.findings : [];
+  const sourceColumnProfiles = Array.isArray(context.columnProfiles) ? context.columnProfiles : [];
+  const findings = sourceFindings
+    .map(compactFinding)
+    .sort((left, right) => severityRank[left.severity] - severityRank[right.severity]
+      || left.ruleId.localeCompare(right.ruleId)
+      || (left.column ?? '').localeCompare(right.column ?? ''))
+    .slice(0, MAX_AI_PROVIDER_FINDINGS);
+  const columnProfiles = sourceColumnProfiles
+    .map(compactColumnProfile)
+    .sort((left, right) => left.columnName.localeCompare(right.columnName))
+    .slice(0, MAX_AI_PROVIDER_COLUMNS);
+
+  const compactContext: AIReportContext = {
+    ...context,
+    datasetId: truncateText(context.datasetId),
+    id: truncateText(context.id),
+    originalFilename: truncateText(context.originalFilename),
+    healthScoreDeductions: compactNumericRecord(context.healthScoreDeductions),
+    scoringVersion: truncateText(context.scoringVersion),
+    profilerVersion: truncateText(context.profilerVersion),
+    createdAt: truncateText(context.createdAt),
+    findings: [],
+    columnProfiles: [],
+  };
+
+  // Alternate high-priority findings and alphabetical columns until the byte-safe
+  // character budget is reached, so neither category can crowd out the other.
+  const maxEntries = Math.max(findings.length, columnProfiles.length);
+  for (let index = 0; index < maxEntries; index += 1) {
+    for (const [field, item] of [
+      ['findings', findings[index]],
+      ['columnProfiles', columnProfiles[index]],
+    ] as const) {
+      if (!item) continue;
+      const candidate = {
+        ...compactContext,
+        [field]: [...compactContext[field], item],
+      };
+      if (JSON.stringify(candidate).length <= MAX_AI_PROVIDER_CONTEXT_CHARACTERS) {
+        compactContext[field] = candidate[field] as never;
+      }
+    }
+  }
+
+  const serializedCharacterCount = JSON.stringify(compactContext).length;
+  return {
+    context: compactContext,
+    diagnostics: {
+      sourceFindingCount: sourceFindings.length,
+      sourceColumnProfileCount: sourceColumnProfiles.length,
+      sentFindingCount: compactContext.findings.length,
+      sentColumnProfileCount: compactContext.columnProfiles.length,
+      serializedCharacterCount,
+    },
+  };
+}
+
 export function mapDatasetToAIReportContext(record: DatasetRecord): AIReportContext {
   const report = record.report;
   const fileSummary = report?.file_summary;

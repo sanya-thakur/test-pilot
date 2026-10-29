@@ -6,6 +6,8 @@ export interface AIRequest {
   temperature?: number;
   maxTokens?: number;
   reportContext?: AIReportContext;
+  /** Server-generated correlation identifier for safe operational diagnostics. */
+  requestId?: string;
 }
 
 export interface AIUsageStats {
