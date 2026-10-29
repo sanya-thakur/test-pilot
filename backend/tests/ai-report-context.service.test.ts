@@ -1,4 +1,9 @@
-import { mapDatasetToAIReportContext, AIReportContextService } from '../src/services/ai-report-context.service';
+import {
+  buildAIProviderContext,
+  mapDatasetToAIReportContext,
+  AIReportContextService,
+  MAX_AI_PROVIDER_CONTEXT_CHARACTERS,
+} from '../src/services/ai-report-context.service';
 import { aiReportContextSchema } from '../src/contracts/ai-report-context';
 import type { DatasetRecord } from '../src/repositories/dataset.repository';
 
@@ -110,5 +115,36 @@ describe('AIReportContextService & Mapper', () => {
 
     expect(mockProfileService.findById).toHaveBeenCalledWith('nonexistent-id');
     expect(result).toBeNull();
+  });
+
+  it('builds a deterministic, bounded provider context without raw samples', () => {
+    const fullContext = mapDatasetToAIReportContext({
+      ...mockPgRecord,
+      findings: Array.from({ length: 30 }, (_, index) => ({
+        rule_id: `rule-${index}`,
+        severity: index === 29 ? 'error' : 'info',
+        column: `column-${index}`,
+        metrics: { count: index, private_text: 'x'.repeat(10_000) },
+      })),
+      columnProfiles: Array.from({ length: 30 }, (_, index) => ({
+        ...mockPgRecord.columnProfiles![0],
+        column_name: `column-${String(index).padStart(2, '0')}`,
+        samples: ['sensitive-value'.repeat(1_000)],
+      })),
+    });
+
+    const first = buildAIProviderContext(fullContext);
+    const second = buildAIProviderContext(fullContext);
+
+    expect(first).toEqual(second);
+    expect(first.diagnostics.sourceFindingCount).toBe(30);
+    expect(first.diagnostics.sourceColumnProfileCount).toBe(30);
+    expect(first.diagnostics.sentFindingCount).toBeLessThanOrEqual(20);
+    expect(first.diagnostics.sentColumnProfileCount).toBeLessThanOrEqual(20);
+    expect(first.diagnostics.serializedCharacterCount).toBeLessThanOrEqual(MAX_AI_PROVIDER_CONTEXT_CHARACTERS);
+    expect(first.context.findings[0].severity).toBe('error');
+    expect(first.context.columnProfiles.every((profile) => profile.samples.length === 0)).toBe(true);
+    expect(JSON.stringify(first.context)).not.toContain('sensitive-value');
+    expect(JSON.stringify(first.context)).not.toContain('private_text');
   });
 });

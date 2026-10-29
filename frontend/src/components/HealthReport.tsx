@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import type { ProfilerResponse } from '../types/profiler';
+import { AIAssistantPanel } from './AIAssistantPanel';
 
 interface HealthReportProps {
   report: ProfilerResponse;
@@ -243,6 +244,8 @@ export function HealthReport({ report, onReset, datasetId, datasetName, isHistor
           </div>
         )}
       </section>
+
+      {datasetId && <AIAssistantPanel datasetId={datasetId} />}
 
       <section className="layout-section compact-section">
         <div className="section-header">

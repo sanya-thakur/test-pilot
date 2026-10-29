@@ -8,3 +8,4 @@ data-engine/uvicorn.err
 __pycache__/
 .pytest_cache/
 data/uploads/
+node_modules
