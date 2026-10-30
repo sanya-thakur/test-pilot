@@ -885,6 +885,11 @@ h3 {
 .project-inventory p { margin-top: 10px; font-size: .82rem; }
 .project-question { display: block; width: 100%; min-height: 90px; box-sizing: border-box; margin-top: 12px; padding: 10px; border: 1px solid rgba(148, 163, 184, .35); border-radius: 10px; background: rgba(2, 6, 23, .6); color: #f8fafc; font: inherit; resize: vertical; }
 .project-question + .secondary-button { margin-top: 10px; }
+.generation-controls, .scenario-options { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; color: #cbd5e1; }
+.generation-controls label, .scenario-options label { display: inline-flex; align-items: center; gap: 6px; }
+.generation-controls input, .generation-controls select { max-width: 110px; padding: 6px; border-radius: 6px; border: 1px solid rgba(148,163,184,.35); background: #0f172a; color: #f8fafc; }
+.generation-result { display: grid; gap: 8px; margin-top: 14px; padding: 12px; border: 1px solid rgba(52,211,153,.3); border-radius: 10px; color: #d1fae5; }
+.generation-result ul { margin: 0; padding-left: 18px; color: #cbd5e1; }
 .project-inventory .assistant-markdown { margin-top: 12px; line-height: 1.6; color: #e2e8f0; }
 .project-inventory .assistant-markdown table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: .86rem; }
 .project-inventory .assistant-markdown th, .project-inventory .assistant-markdown td { padding: 8px; border: 1px solid rgba(148, 163, 184, .22); text-align: left; vertical-align: top; }

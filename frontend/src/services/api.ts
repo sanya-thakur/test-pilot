@@ -5,6 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000
 
 export interface ProjectOverview { id: string; originalFilename: string; createdAt: string; fileCount: number; totalUncompressedBytes: number; languages: string[]; frameworks: string[]; manifests: string[]; routes: string[]; schemas: string[]; tests: string[]; files: Array<{ path: string; sizeBytes: number; extension: string }>; }
 export interface ProjectAssistantResponse { projectId: string; message: string; answer: string; evidence: Array<{ path: string; reason: string }>; }
+export interface GeneratedDataset { id: string; projectId: string; filename: string; format: 'csv' | 'json'; createdAt: string; recordCount: number; seed: number; scenarios: string[]; model: { name: string; fields: Array<{ name: string; type: string; required: boolean }> }; validation: Record<string, { generated: number; valid: number; invalid: number; intent: string }>; }
 
 const getErrorMessage = async (response: Response, fallback: string): Promise<string> => {
   const text = await response.text();
@@ -102,6 +103,14 @@ export async function deleteProject(id: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/v1/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!response.ok) throw new Error(await getErrorMessage(response, 'Project could not be deleted.'));
 }
+
+export async function generateDataset(projectId: string, input: { recordCount: number; format: 'csv' | 'json'; scenarios: string[] }): Promise<GeneratedDataset> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${encodeURIComponent(projectId)}/datasets/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Dataset generation could not be completed.'));
+  return await response.json() as GeneratedDataset;
+}
+
+export function generatedDatasetDownloadUrl(projectId: string, artifactId: string): string { return `${API_BASE_URL}/api/v1/projects/${encodeURIComponent(projectId)}/datasets/${encodeURIComponent(artifactId)}/download`; }
 
 export async function askProjectAssistant(projectId: string, message: string, history: Array<{ role: 'user' | 'assistant'; content: string }>): Promise<ProjectAssistantResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/projects/${encodeURIComponent(projectId)}/ai-assistant`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, history }) });
