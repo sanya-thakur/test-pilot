@@ -17,6 +17,8 @@ export interface ProjectRecord {
   schemas: string[];
   tests: string[];
   files: ProjectFileSummary[];
+  /** Internal extraction location; controllers must never expose it. */
+  sourceRoot?: string;
 }
 
 export interface ProjectRepository {
