@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import type { AIProvider } from '../contracts/ai-provider.contract';
 import { createAIProvider } from '../providers/ai-provider.factory';
 import type { ProjectRepository } from '../repositories/project.repository';
+import type { ProjectFileSummary } from '../repositories/project.repository';
 import { LocalProjectRepository } from '../repositories/local-project.repository';
 import type { ProjectAIAssistantRequest, ProjectAIAssistantResponse } from '../contracts/project-ai-assistant.contract';
 import { buildProjectAssistantSystemPrompt } from '../prompts/project-ai-assistant.prompt';
@@ -19,8 +20,11 @@ export class ProjectAIAssistantService {
     const project = await this.projects.findById(projectId); if (!project) return null;
     if (!project.sourceRoot) throw new ProjectSourceUnavailableError('Project source is unavailable');
     const terms = words(`${input.message} ${input.history.map((item) => item.content).join(' ')}`);
-    const candidates = project.files.map((file) => ({ file, score: [...terms].reduce((score, term) => score + (file.path.toLowerCase().includes(term) ? 3 : 0), 0) + (project.routes.includes(file.path) ? 1 : 0) }));
-    const selected = candidates.sort((a, b) => b.score - a.score || a.file.path.localeCompare(b.file.path)).slice(0, MAX_FILES).map((item) => item.file);
+    const candidates = project.files.map((file) => ({ file, score: [...terms].reduce((score, term) => score + (file.path.toLowerCase().includes(term) ? 3 : 0), 0) + (project.routes.includes(file.path) ? 1 : 0) + (project.schemas.includes(file.path) ? 2 : 0) + (project.tests.includes(file.path) ? 2 : 0) }));
+    const ranked = candidates.sort((a, b) => b.score - a.score || a.file.path.localeCompare(b.file.path));
+    // Broad questions have no meaningful filename match. Include diverse evidence
+    // rather than filling the context with arbitrary route files.
+    const selected: ProjectFileSummary[] = (ranked[0]?.score ?? 0) > 0 ? ranked.slice(0, MAX_FILES).map((item) => item.file) : [...project.schemas, ...project.tests, ...project.manifests, ...project.routes].map((entry) => project.files.find((file) => file.path === entry)).filter((file): file is ProjectFileSummary => Boolean(file)).slice(0, MAX_FILES);
     let used = 0; const excerpts: Array<{ path: string; content: string }> = [];
     for (const file of selected) {
       const fullPath = path.resolve(project.sourceRoot, file.path);
