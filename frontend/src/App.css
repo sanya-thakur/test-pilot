@@ -868,6 +868,12 @@ h3 {
 }
 
 .project-overview { display: grid; gap: 16px; margin-top: 20px; }
+.project-workspace { display: grid; grid-template-columns: minmax(190px, 250px) minmax(0, 1fr); gap: 18px; margin-top: 20px; align-items: start; }
+.project-workspace .project-overview { margin-top: 0; }
+.project-history { position: sticky; top: 16px; padding: 16px; border: 1px solid rgba(148, 163, 184, .12); border-radius: 16px; background: rgba(15, 23, 42, .56); }
+.project-history .history-list { max-height: 58vh; }
+.project-history .history-item { cursor: pointer; }
+.project-history .history-item span { color: #94a3b8; font-size: .78rem; }
 .project-overview-heading { display: grid; gap: 4px; color: #cbd5e1; }
 .project-overview-heading strong { color: #f8fafc; overflow-wrap: anywhere; }
 .project-inventory-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -877,6 +883,12 @@ h3 {
 .project-inventory ul { max-height: 150px; overflow: auto; margin: 10px 0 0; padding-left: 18px; color: #a5b4cf; font: .78rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .project-inventory li { overflow-wrap: anywhere; margin: 4px 0; }
 .project-inventory p { margin-top: 10px; font-size: .82rem; }
+.project-question { display: block; width: 100%; min-height: 90px; box-sizing: border-box; margin-top: 12px; padding: 10px; border: 1px solid rgba(148, 163, 184, .35); border-radius: 10px; background: rgba(2, 6, 23, .6); color: #f8fafc; font: inherit; resize: vertical; }
+.project-question + .secondary-button { margin-top: 10px; }
+.project-inventory .assistant-markdown { margin-top: 12px; line-height: 1.6; color: #e2e8f0; }
+.project-inventory .assistant-markdown table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: .86rem; }
+.project-inventory .assistant-markdown th, .project-inventory .assistant-markdown td { padding: 8px; border: 1px solid rgba(148, 163, 184, .22); text-align: left; vertical-align: top; }
+.project-inventory .assistant-markdown code { padding: .1em .3em; border-radius: 4px; background: rgba(2, 6, 23, .7); color: #bae6fd; }
 
 .fact-row {
   width: 100%;
@@ -1004,6 +1016,8 @@ h3 {
   }
 
   .project-inventory-grid { grid-template-columns: 1fr; }
+  .project-workspace { grid-template-columns: 1fr; }
+  .project-history { position: static; }
 
   .history-panel {
     position: static;

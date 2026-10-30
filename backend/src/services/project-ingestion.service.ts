@@ -79,7 +79,7 @@ export class ProjectIngestionService {
         });
       });
     } catch (error) { await fs.rm(root, { recursive: true, force: true }); throw error; }
-    return this.repository.create(this.inventory(originalFilename, files, totalBytes));
+    return this.repository.create({ ...this.inventory(originalFilename, files, totalBytes), sourceRoot: root });
   }
 
   async list(): Promise<ProjectRecord[]> { return this.repository.list(); }

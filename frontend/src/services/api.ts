@@ -4,6 +4,7 @@ import type { AIAssistantRequest, AIAssistantResponse } from '../types/ai-assist
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000';
 
 export interface ProjectOverview { id: string; originalFilename: string; createdAt: string; fileCount: number; totalUncompressedBytes: number; languages: string[]; frameworks: string[]; manifests: string[]; routes: string[]; schemas: string[]; tests: string[]; files: Array<{ path: string; sizeBytes: number; extension: string }>; }
+export interface ProjectAssistantResponse { projectId: string; message: string; answer: string; evidence: Array<{ path: string; reason: string }>; }
 
 const getErrorMessage = async (response: Response, fallback: string): Promise<string> => {
   const text = await response.text();
@@ -95,6 +96,12 @@ export async function getProjects(): Promise<ProjectOverview[]> {
   const data: unknown = await response.json();
   if (!Array.isArray(data)) throw new Error('Malformed project overview received from the backend.');
   return data as ProjectOverview[];
+}
+
+export async function askProjectAssistant(projectId: string, message: string, history: Array<{ role: 'user' | 'assistant'; content: string }>): Promise<ProjectAssistantResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${encodeURIComponent(projectId)}/ai-assistant`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, history }) });
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Project assistant could not answer right now.'));
+  return await response.json() as ProjectAssistantResponse;
 }
 
 export async function getDatasetHistory(): Promise<DatasetSummary[]> {

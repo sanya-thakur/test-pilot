@@ -1,10 +1,10 @@
-import type { AIReportContext } from './ai-report-context';
 
 export interface AIRequest {
   prompt: string;
   systemPrompt?: string;
   temperature?: number;
   maxTokens?: number;
+  /** Bounded, server-generated context. Never populated directly from client input. */
   reportContext?: AIReportContext;
   /** Server-generated correlation identifier for safe operational diagnostics. */
   requestId?: string;
@@ -67,3 +67,4 @@ export interface AIProvider {
   readonly modelName: string;
   generateResponse(input: AIRequest): Promise<AIResponse>;
 }
+import type { AIReportContext } from './ai-report-context';

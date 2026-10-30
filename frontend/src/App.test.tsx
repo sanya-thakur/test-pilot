@@ -10,6 +10,7 @@ const mockDeleteDataset = vi.fn();
 const mockAskAIAssistant = vi.fn();
 const mockGetProjects = vi.fn();
 const mockIngestProject = vi.fn();
+const mockAskProjectAssistant = vi.fn();
 
 const savedDataset = {
   id: 'saved-dataset-1',
@@ -43,6 +44,7 @@ vi.mock('./services/api', () => ({
   askAIAssistant: (...args: unknown[]) => mockAskAIAssistant(...args),
   getProjects: (...args: unknown[]) => mockGetProjects(...args),
   ingestProject: (...args: unknown[]) => mockIngestProject(...args),
+  askProjectAssistant: (...args: unknown[]) => mockAskProjectAssistant(...args),
 }));
 
 describe('TestPilot app', () => {
