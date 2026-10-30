@@ -11,12 +11,13 @@ import type { AIReportContext } from '../contracts/ai-report-context';
 
 const MAX_FILES = 6; const MAX_CHARS = 18_000;
 const words = (text: string) => new Set(text.toLowerCase().match(/[a-z][a-z0-9_-]{2,}/g) ?? []);
+export class ProjectSourceUnavailableError extends Error {}
 
 export class ProjectAIAssistantService {
   constructor(private readonly provider: AIProvider = createAIProvider(), private readonly projects: ProjectRepository = new LocalProjectRepository()) {}
   async ask(projectId: string, input: ProjectAIAssistantRequest): Promise<ProjectAIAssistantResponse | null> {
     const project = await this.projects.findById(projectId); if (!project) return null;
-    if (!project.sourceRoot) throw new Error('Project source is unavailable');
+    if (!project.sourceRoot) throw new ProjectSourceUnavailableError('Project source is unavailable');
     const terms = words(`${input.message} ${input.history.map((item) => item.content).join(' ')}`);
     const candidates = project.files.map((file) => ({ file, score: [...terms].reduce((score, term) => score + (file.path.toLowerCase().includes(term) ? 3 : 0), 0) + (project.routes.includes(file.path) ? 1 : 0) }));
     const selected = candidates.sort((a, b) => b.score - a.score || a.file.path.localeCompare(b.file.path)).slice(0, MAX_FILES).map((item) => item.file);

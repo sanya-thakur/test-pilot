@@ -877,6 +877,8 @@ h3 {
 .project-inventory ul { max-height: 150px; overflow: auto; margin: 10px 0 0; padding-left: 18px; color: #a5b4cf; font: .78rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .project-inventory li { overflow-wrap: anywhere; margin: 4px 0; }
 .project-inventory p { margin-top: 10px; font-size: .82rem; }
+.project-question { display: block; width: 100%; min-height: 90px; box-sizing: border-box; margin-top: 12px; padding: 10px; border: 1px solid rgba(148, 163, 184, .35); border-radius: 10px; background: rgba(2, 6, 23, .6); color: #f8fafc; font: inherit; resize: vertical; }
+.project-question + .secondary-button { margin-top: 10px; }
 
 .fact-row {
   width: 100%;
