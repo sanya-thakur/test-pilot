@@ -16,6 +16,7 @@
   "dependencies": {
     "@google/genai": "2.30.0",
     "@prisma/client": "^6.4.1",
+    "@types/yauzl": "^3.4.0",
     "axios": "^1.20.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -24,6 +25,7 @@
     "helmet": "^8.3.0",
     "multer": "^2.3.0",
     "openai": "^7.10.0",
+    "yauzl": "^3.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -34,12 +36,14 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^26.4.0",
     "@types/supertest": "^7.2.1",
+    "@types/yazl": "^3.3.1",
     "jest": "^30.5.0",
     "nodemon": "^3.1.14",
     "prisma": "^6.4.1",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.12",
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "yazl": "^3.3.1"
   }
 }

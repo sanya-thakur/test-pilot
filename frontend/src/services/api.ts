@@ -3,6 +3,8 @@ import type { AIAssistantRequest, AIAssistantResponse } from '../types/ai-assist
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000';
 
+export interface ProjectOverview { id: string; originalFilename: string; createdAt: string; fileCount: number; totalUncompressedBytes: number; languages: string[]; frameworks: string[]; manifests: string[]; routes: string[]; schemas: string[]; tests: string[]; files: Array<{ path: string; sizeBytes: number; extension: string }>; }
+
 const getErrorMessage = async (response: Response, fallback: string): Promise<string> => {
   const text = await response.text();
 
@@ -78,6 +80,21 @@ export async function uploadDataset(file: File): Promise<UploadedProfilerRespons
   }
 
   return data;
+}
+
+export async function ingestProject(file: File): Promise<ProjectOverview> {
+  const formData = new FormData(); formData.append('file', file, file.name);
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/ingest`, { method: 'POST', body: formData });
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Project ingestion could not be completed.'));
+  return await response.json() as ProjectOverview;
+}
+
+export async function getProjects(): Promise<ProjectOverview[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects`);
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Project overview could not be loaded.'));
+  const data: unknown = await response.json();
+  if (!Array.isArray(data)) throw new Error('Malformed project overview received from the backend.');
+  return data as ProjectOverview[];
 }
 
 export async function getDatasetHistory(): Promise<DatasetSummary[]> {

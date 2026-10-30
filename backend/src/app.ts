@@ -14,9 +14,11 @@ app.use(express.urlencoded({ extended: true }));
 
 import healthRoute from './routes/health.route';
 import datasetsRoute from './routes/datasets.route';
+import projectsRoute from './routes/projects.route';
 
 // Routes will be added here
 app.use('/api/v1/health', healthRoute);
 app.use('/api/v1/datasets', datasetsRoute);
+app.use('/api/v1/projects', projectsRoute);
 
 export default app;

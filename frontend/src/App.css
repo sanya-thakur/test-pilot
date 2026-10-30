@@ -867,6 +867,17 @@ h3 {
   gap: 8px;
 }
 
+.project-overview { display: grid; gap: 16px; margin-top: 20px; }
+.project-overview-heading { display: grid; gap: 4px; color: #cbd5e1; }
+.project-overview-heading strong { color: #f8fafc; overflow-wrap: anywhere; }
+.project-inventory-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.project-inventory { min-width: 0; padding: 14px; border: 1px solid rgba(148, 163, 184, 0.12); border-radius: 14px; background: rgba(15, 23, 42, 0.56); }
+.project-inventory h3 { font-size: .85rem; color: #e2e8f0; }
+.project-inventory h3 span { color: #94a3b8; font-weight: 400; }
+.project-inventory ul { max-height: 150px; overflow: auto; margin: 10px 0 0; padding-left: 18px; color: #a5b4cf; font: .78rem ui-monospace, SFMono-Regular, Consolas, monospace; }
+.project-inventory li { overflow-wrap: anywhere; margin: 4px 0; }
+.project-inventory p { margin-top: 10px; font-size: .82rem; }
+
 .fact-row {
   width: 100%;
   padding: 8px 10px;
@@ -991,6 +1002,8 @@ h3 {
   .workspace-grid {
     grid-template-columns: 1fr;
   }
+
+  .project-inventory-grid { grid-template-columns: 1fr; }
 
   .history-panel {
     position: static;

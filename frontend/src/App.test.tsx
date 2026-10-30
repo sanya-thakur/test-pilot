@@ -8,6 +8,8 @@ const mockGetDatasetHistory = vi.fn();
 const mockGetDatasetById = vi.fn();
 const mockDeleteDataset = vi.fn();
 const mockAskAIAssistant = vi.fn();
+const mockGetProjects = vi.fn();
+const mockIngestProject = vi.fn();
 
 const savedDataset = {
   id: 'saved-dataset-1',
@@ -39,6 +41,8 @@ vi.mock('./services/api', () => ({
   getDatasetById: (...args: unknown[]) => mockGetDatasetById(...args),
   deleteDataset: (...args: unknown[]) => mockDeleteDataset(...args),
   askAIAssistant: (...args: unknown[]) => mockAskAIAssistant(...args),
+  getProjects: (...args: unknown[]) => mockGetProjects(...args),
+  ingestProject: (...args: unknown[]) => mockIngestProject(...args),
 }));
 
 describe('TestPilot app', () => {
@@ -46,6 +50,7 @@ describe('TestPilot app', () => {
     vi.clearAllMocks();
     mockGetDatasetHistory.mockResolvedValue([]);
     mockDeleteDataset.mockResolvedValue(undefined);
+    mockGetProjects.mockResolvedValue([]);
   });
 
   it('connects the assistant to a saved dataset and clears it when the report closes', async () => {
