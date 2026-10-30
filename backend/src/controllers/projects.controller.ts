@@ -4,6 +4,8 @@ import { ProjectIngestionError, projectIngestionService } from '../services/proj
 import { ProjectAIAssistantRequestSchema } from '../contracts/project-ai-assistant.contract';
 import { ProjectSourceUnavailableError, projectAIAssistantService } from '../services/project-ai-assistant.service';
 import { AIProviderAPIError, AIProviderConfigError, AIProviderError, AIProviderTimeoutError } from '../contracts/ai-provider.contract';
+import { DatasetGenerationRequestSchema } from '../contracts/dataset-generation.contract';
+import { datasetGenerationService } from '../services/dataset-generation.service';
 
 const publicProject = <T extends { sourceRoot?: string }>(project: T): Omit<T, 'sourceRoot'> => {
   const { sourceRoot: _sourceRoot, ...safe } = project; return safe;
@@ -45,6 +47,21 @@ export const deleteProject = async (req: Request, res: Response): Promise<void> 
     if (!await projectIngestionService.delete(id)) { res.status(404).json({ error: 'Project not found' }); return; }
     res.status(200).json({ message: 'Project deleted' });
   } catch { res.status(500).json({ error: 'Project could not be deleted.' }); }
+};
+
+export const generateDataset = async (req: Request, res: Response): Promise<void> => {
+  const parsed = DatasetGenerationRequestSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: 'Invalid generation settings.' }); return; }
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  try { const artifact = await datasetGenerationService.generate(id, parsed.data); if (!artifact) { res.status(404).json({ error: 'Project not found' }); return; } res.status(201).json(artifact); }
+  catch { res.status(500).json({ error: 'Dataset generation could not be completed.' }); }
+};
+
+export const downloadGeneratedDataset = async (req: Request, res: Response): Promise<void> => {
+  const projectId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id; const artifactId = Array.isArray(req.params.artifactId) ? req.params.artifactId[0] : req.params.artifactId;
+  const artifact = await datasetGenerationService.download(projectId, artifactId);
+  if (!artifact) { res.status(404).json({ error: 'Generated dataset not found' }); return; }
+  res.download(artifact.path, artifact.filename);
 };
 
 export const askProjectAssistant = async (req: Request, res: Response): Promise<void> => {
