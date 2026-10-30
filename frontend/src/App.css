@@ -885,6 +885,10 @@ h3 {
 .project-inventory p { margin-top: 10px; font-size: .82rem; }
 .project-question { display: block; width: 100%; min-height: 90px; box-sizing: border-box; margin-top: 12px; padding: 10px; border: 1px solid rgba(148, 163, 184, .35); border-radius: 10px; background: rgba(2, 6, 23, .6); color: #f8fafc; font: inherit; resize: vertical; }
 .project-question + .secondary-button { margin-top: 10px; }
+.project-inventory .assistant-markdown { margin-top: 12px; line-height: 1.6; color: #e2e8f0; }
+.project-inventory .assistant-markdown table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: .86rem; }
+.project-inventory .assistant-markdown th, .project-inventory .assistant-markdown td { padding: 8px; border: 1px solid rgba(148, 163, 184, .22); text-align: left; vertical-align: top; }
+.project-inventory .assistant-markdown code { padding: .1em .3em; border-radius: 4px; background: rgba(2, 6, 23, .7); color: #bae6fd; }
 
 .fact-row {
   width: 100%;

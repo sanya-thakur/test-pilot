@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { askProjectAssistant, getProjects, ingestProject, type ProjectOverview } from '../services/api';
 
 export function ProjectIngestionPanel() {
@@ -29,7 +31,7 @@ export function ProjectIngestionPanel() {
         <Inventory label="Tests" entries={selectedProject.tests} />
       </div>
       <Inventory label="Files (first 20)" entries={selectedProject.files.slice(0, 20).map((file) => file.path)} />
-      <section className="project-inventory"><h3>Ask about this project</h3><p className="muted-copy">Answers cite the selected source files; code is never executed.</p><div className="assistant-answer" aria-live="polite">{conversation.map((item, index) => <p key={index}><strong>{item.role === 'user' ? 'You' : 'Assistant'}:</strong> {item.content}</p>)}{isAsking && <p className="assistant-status">Finding relevant files and asking the assistant…</p>}</div>{assistantError && <div className="error-box" role="alert">{assistantError}</div>}<textarea className="project-question" aria-label="Project question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about architecture, APIs, validation, tests, or files" disabled={isAsking} /><button className="secondary-button" type="button" onClick={() => void ask()} disabled={!question.trim() || isAsking}>{isAsking ? 'Asking…' : 'Ask project assistant'}</button></section>
+      <section className="project-inventory"><h3>Ask about this project</h3><p className="muted-copy">Answers cite the selected source files; code is never executed.</p><div className="assistant-answer" aria-live="polite">{conversation.map((item, index) => item.role === 'user' ? <p key={index}><strong>You:</strong> {item.content}</p> : <div key={index} className="assistant-markdown"><strong>Assistant:</strong><Markdown remarkPlugins={[remarkGfm]} skipHtml allowedElements={['h1', 'h2', 'h3', 'h4', 'p', 'strong', 'em', 'ol', 'ul', 'li', 'code', 'pre', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'br']}>{item.content}</Markdown></div>)}{isAsking && <p className="assistant-status">Finding relevant files and asking the assistant…</p>}</div>{assistantError && <div className="error-box" role="alert">{assistantError}</div>}<textarea className="project-question" aria-label="Project question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about architecture, APIs, validation, tests, or files" disabled={isAsking} /><button className="secondary-button" type="button" onClick={() => void ask()} disabled={!question.trim() || isAsking}>{isAsking ? 'Asking…' : 'Ask project assistant'}</button></section>
     </div>}</div>
   </section>;
 }
