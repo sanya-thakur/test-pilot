@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { askProjectAssistant, getProject, ingestProject, listProjects } from '../controllers/projects.controller';
+import { askProjectAssistant, deleteProject, getProject, ingestProject, listProjects } from '../controllers/projects.controller';
 import { projectUploadMiddleware } from '../storage/project-upload.storage';
 import { megabytes, projectIngestionLimits } from '../services/project-ingestion.limits';
 
@@ -15,6 +15,7 @@ const upload = (req: Request, res: Response, next: NextFunction): void => {
 
 router.post('/ingest', upload, ingestProject);
 router.get('/', listProjects);
+router.delete('/:id', deleteProject);
 router.post('/:id/ai-assistant', askProjectAssistant);
 router.get('/:id', getProject);
 export default router;

@@ -18,6 +18,14 @@ export class LocalProjectRepository implements ProjectRepository {
 
   async list(): Promise<ProjectRecord[]> { return this.read(); }
   async findById(id: string): Promise<ProjectRecord | null> { return (await this.read()).find((project) => project.id === id) || null; }
+  async delete(id: string): Promise<ProjectRecord | null> {
+    const records = await this.read();
+    const index = records.findIndex((project) => project.id === id);
+    if (index < 0) return null;
+    const [deleted] = records.splice(index, 1);
+    await this.write(records);
+    return deleted;
+  }
 
   private async read(): Promise<ProjectRecord[]> {
     try {

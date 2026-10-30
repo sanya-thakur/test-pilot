@@ -6,7 +6,7 @@ jest.mock('../src/services/project-ingestion.service', () => ({
   ProjectIngestionError: class ProjectIngestionError extends Error {
     constructor(public code: string, message: string) { super(message); }
   },
-  projectIngestionService: { ingest: jest.fn(), list: jest.fn(), findById: jest.fn() },
+  projectIngestionService: { ingest: jest.fn(), list: jest.fn(), findById: jest.fn(), delete: jest.fn() },
 }));
 
 describe('Project routes', () => {

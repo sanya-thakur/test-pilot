@@ -13,6 +13,7 @@ class MemoryProjects implements ProjectRepository {
   }
   async list(): Promise<ProjectRecord[]> { return this.records; }
   async findById(id: string): Promise<ProjectRecord | null> { return this.records.find((record) => record.id === id) || null; }
+  async delete(id: string): Promise<ProjectRecord | null> { const index = this.records.findIndex((record) => record.id === id); return index < 0 ? null : this.records.splice(index, 1)[0]; }
 }
 
 const writeZip = (filename: string, entries: Record<string, string>): Promise<void> => new Promise((resolve, reject) => {

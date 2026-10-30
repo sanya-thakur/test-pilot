@@ -25,4 +25,5 @@ export interface ProjectRepository {
   create(input: Omit<ProjectRecord, 'id' | 'createdAt'>): Promise<ProjectRecord>;
   list(): Promise<ProjectRecord[]>;
   findById(id: string): Promise<ProjectRecord | null>;
+  delete(id: string): Promise<ProjectRecord | null>;
 }

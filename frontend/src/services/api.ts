@@ -98,6 +98,11 @@ export async function getProjects(): Promise<ProjectOverview[]> {
   return data as ProjectOverview[];
 }
 
+export async function deleteProject(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Project could not be deleted.'));
+}
+
 export async function askProjectAssistant(projectId: string, message: string, history: Array<{ role: 'user' | 'assistant'; content: string }>): Promise<ProjectAssistantResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/projects/${encodeURIComponent(projectId)}/ai-assistant`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, history }) });
   if (!response.ok) throw new Error(await getErrorMessage(response, 'Project assistant could not answer right now.'));

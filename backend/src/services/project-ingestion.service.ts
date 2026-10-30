@@ -84,6 +84,14 @@ export class ProjectIngestionService {
 
   async list(): Promise<ProjectRecord[]> { return this.repository.list(); }
   async findById(id: string): Promise<ProjectRecord | null> { return this.repository.findById(id); }
+  async delete(id: string): Promise<boolean> {
+    const project = await this.repository.delete(id); if (!project) return false;
+    if (project.sourceRoot) {
+      const base = path.resolve(this.extractionRoot); const target = path.resolve(project.sourceRoot);
+      if (target.startsWith(`${base}${path.sep}`)) await fs.rm(target, { recursive: true, force: true });
+    }
+    return true;
+  }
 
   private inventory(originalFilename: string, files: ProjectFileSummary[], totalUncompressedBytes: number): Omit<ProjectRecord, 'id' | 'createdAt'> {
     const paths = files.map((file) => file.path);

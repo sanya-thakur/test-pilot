@@ -12,7 +12,7 @@ describe('ProjectAIAssistantService', () => {
 
   it('sends only bounded, selected source evidence and history to the configured provider', async () => {
     const project: ProjectRecord = { id: 'project-1', originalFilename: 'demo.zip', createdAt: '', sourceRoot: root, fileCount: 2, totalUncompressedBytes: 1, languages: ['TypeScript'], frameworks: ['Express'], manifests: [], routes: ['users.route.ts'], schemas: ['schema.prisma'], tests: [], files: [{ path: 'users.route.ts', sizeBytes: 1, extension: '.ts' }, { path: 'schema.prisma', sizeBytes: 1, extension: '.prisma' }] };
-    const repository: ProjectRepository = { create: jest.fn(), list: jest.fn(), findById: jest.fn().mockResolvedValue(project) };
+    const repository: ProjectRepository = { create: jest.fn(), list: jest.fn(), findById: jest.fn().mockResolvedValue(project), delete: jest.fn() };
     const provider: AIProvider = { providerName: 'test', modelName: 'test', generateResponse: jest.fn<Promise<AIResponse>, [AIRequest]>().mockResolvedValue({ text: 'Answer with `users.route.ts`.', model: 'test', provider: 'test' }) };
     const service = new ProjectAIAssistantService(provider, repository);
     const result = await service.ask('project-1', { message: 'How is the users API routed?', history: [{ role: 'user', content: 'Focus on API design' }] });

@@ -39,6 +39,14 @@ export const getProject = async (req: Request, res: Response): Promise<void> => 
   } catch { res.status(500).json({ error: 'Project overview could not be loaded.' }); }
 };
 
+export const deleteProject = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (!await projectIngestionService.delete(id)) { res.status(404).json({ error: 'Project not found' }); return; }
+    res.status(200).json({ message: 'Project deleted' });
+  } catch { res.status(500).json({ error: 'Project could not be deleted.' }); }
+};
+
 export const askProjectAssistant = async (req: Request, res: Response): Promise<void> => {
   const parsed = ProjectAIAssistantRequestSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: 'Provide a question and at most 12 valid history messages.' }); return; }
